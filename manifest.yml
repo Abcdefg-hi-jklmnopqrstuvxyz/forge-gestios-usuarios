@@ -1,0 +1,42 @@
+modules:
+  jira:globalPage:
+    - key: usuarios-admin-page
+      resource: main
+      resolver:
+        function: resolver
+      title: "Gestión de base de datos de clientes"
+      route: admin-users
+
+  jira:customField:
+    - key: usuario-registrado-field
+      name: Clientes registrados
+      description: Selecciona un cliente de la base de datos
+      type: object
+      resource: main
+      resolver:
+        function: resolver
+      edit:
+        resource: main
+      formatter:
+        expression: "value.name"
+
+  function:
+    - key: resolver
+      handler: index.handler
+
+resources:
+  - key: main
+    path: static/hello-world/build
+
+permissions:
+  scopes:
+    - read:jira-work
+    - write:jira-work
+    - storage:app
+
+app:
+  runtime:
+    name: nodejs22.x
+    memoryMB: 256
+    architecture: arm64
+  id: ari:cloud:ecosystem::app/008d0ac1-b35d-4092-8f57-e3685e7b264d
