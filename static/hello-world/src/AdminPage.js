@@ -15,7 +15,6 @@ function AdminPage() {
   const [users, setUsers] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
 
-  // New form fields
   const [tipo, setTipo] = useState(TYPES[0]);
   const [cliente, setCliente] = useState(CLIENTS[0]);
   const [usuario, setUsuario] = useState('');
@@ -66,7 +65,7 @@ function AdminPage() {
       const ws = wb.Sheets[wsname];
       const data = XLSX.utils.sheet_to_json(ws, { defval: '' });
 
-      // Map various possible column names to our schema
+     
       const cleanData = data.map(row => ({
         tipo: row.Tipo || row.tipo || row.Type || 'Nota',
         cliente: row.Cliente || row.cliente || row.Organization || CLIENTS[0],
@@ -74,7 +73,7 @@ function AdminPage() {
         telefono: String(row.Telefono || row.TELEFONO || row.phone || row.Phone || ''),
         departamento: row.Departamento || row.departamento || row.Area || row.area || ''
       }))
-      .filter(r => r.usuario && r.cliente); // require minimal fields
+      .filter(r => r.usuario && r.cliente);
 
       saveBulk(cleanData);
     };
@@ -167,7 +166,7 @@ function AdminPage() {
           </div>
           <div className="form-group">
             <label className="label">Teléfono</label>
-            <input className="input" value={telefono} onChange={e => setTelefono(e.target.value)} placeholder="+51..." />
+            <input className="input" value={telefono} onChange={e => setTelefono(e.target.value)} placeholder="+1..." />
           </div>
           <div className="form-group">
             <label className="label">Departamento</label>

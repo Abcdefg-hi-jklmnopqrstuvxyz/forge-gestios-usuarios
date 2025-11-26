@@ -21,19 +21,16 @@ const CustomFieldUser = () => {
   }, []);
 
   useEffect(() => {
-    // get existing value (if editing)
     view.getContext().then((ctx) => {
       const fieldValue = ctx.extension.fieldValue;
       if (fieldValue && typeof fieldValue === 'object') {
         setSelectedUserObj(fieldValue);
-        // prefill tipo/cliente if available
         if (fieldValue.tipo) setTipo(fieldValue.tipo);
         if (fieldValue.cliente) setCliente(fieldValue.cliente);
       }
     });
   }, []);
 
-  // filter users by selected cliente and tipo
   const filtered = users.filter(u => u.cliente === cliente && u.tipo === tipo);
 
   const handleUserChange = (e) => {
@@ -41,16 +38,13 @@ const CustomFieldUser = () => {
     const userObj = filtered.find(u => u.usuario === username);
     if (userObj) {
       setSelectedUserObj(userObj);
-      // submit the whole object to be stored (Option B)
       view.submit(userObj);
     } else {
-      // clear
       setSelectedUserObj(null);
       view.submit(null);
     }
   };
 
-  // If cliente/tipo changes we clear selection
   const handleTipoChange = (val) => {
     setTipo(val);
     setSelectedUserObj(null);

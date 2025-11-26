@@ -17,23 +17,20 @@ async function getAllUsersRaw() {
   return item ? item : [];
 }
 
-/**
- * Normaliza datos antiguos (formatos {name, phone}) a nuevo esquema:
- * { tipo, cliente, usuario, telefono, departamento }
- */
+//datos{ tipo, cliente, usuario, telefono, departamento }
 function normalizeEntries(entries) {
   return entries.map(e => {
-    // detect older format
+
     if (e.name || e.phone) {
       return {
-        tipo: TYPES[0], // default 'Nota' (puedes ajustar)
-        cliente: CLIENTS[0], // default primer cliente
+        tipo: TYPES[0],
+        cliente: CLIENTS[0],
         usuario: e.name || '',
         telefono: e.phone || '',
         departamento: e.departamento || ''
       };
     }
-    // If already in new schema, ensure keys exist
+
     return {
       tipo: e.tipo || TYPES[0],
       cliente: e.cliente || CLIENTS[0],
@@ -47,8 +44,6 @@ function normalizeEntries(entries) {
 async function getAllUsers() {
   const raw = await getAllUsersRaw();
   const normalized = normalizeEntries(raw);
-  // update storage if normalization changed shape (so migration is automatic)
-  // check by simple heuristic: if any item had .name present originally, we should overwrite
   if (raw.length > 0 && raw.some(r => r.name || r.phone) ) {
     await storage.set('users', normalized);
   }
@@ -62,14 +57,11 @@ resolver.define('getUsers', async () => {
 resolver.define('saveUser', async (req) => {
   const { tipo, cliente, usuario, telefono, departamento } = req.payload;
   let users = await getAllUsers();
-
-  // avoid duplicate exact records (same tipo+cliente+usuario)
   const exists = users.find(u => u.tipo === tipo && u.cliente === cliente && u.usuario === usuario);
   if (!exists) {
     users.push({ tipo, cliente, usuario, telefono, departamento });
     await storage.set('users', users);
   } else {
-    // If exists, optionally we could update telefono/departamento if changed; let's update them:
     users = users.map(u => {
       if (u.tipo === tipo && u.cliente === cliente && u.usuario === usuario) {
         return { tipo, cliente, usuario, telefono, departamento };
@@ -82,9 +74,6 @@ resolver.define('saveUser', async (req) => {
   return { success: true };
 });
 
-/**
- * Update user found by original keys (originalTipo, originalCliente, originalUsuario)
- */
 resolver.define('updateUser', async (req) => {
   const { originalTipo, originalCliente, originalUsuario, tipo, cliente, usuario, telefono, departamento } = req.payload;
   let users = await getAllUsers();
@@ -101,9 +90,6 @@ resolver.define('updateUser', async (req) => {
   return { success: false, error: 'Usuario no encontrado' };
 });
 
-/**
- * Delete by composite key
- */
 resolver.define('deleteUser', async (req) => {
   const { tipo, cliente, usuario } = req.payload;
   let users = await getAllUsers();
@@ -112,15 +98,9 @@ resolver.define('deleteUser', async (req) => {
   return { success: true };
 });
 
-/**
- * Bulk save: accepts array of entries in the new schema.
- * Deduplicate by composite key tipo+cliente+usuario (keeps last occurrence).
- */
 resolver.define('bulkSaveUsers', async (req) => {
-  const { newUsers } = req.payload; // expects array of { tipo, cliente, usuario, telefono, departamento }
+  const { newUsers } = req.payload;
   let currentUsers = await getAllUsers();
-
-  // combine and dedupe by composite key
   const combined = [...currentUsers, ...newUsers];
 
   const map = new Map();
