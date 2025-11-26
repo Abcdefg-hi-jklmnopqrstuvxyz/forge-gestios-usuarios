@@ -1,17 +1,13 @@
 {
-  "name": "jira-global-page-custom-ui-static",
-  "version": "0.1.57",
+  "name": "jira-project-page-custom-ui-static",
+  "version": "0.1.59",
   "private": true,
   "homepage": ".",
   "dependencies": {
-    "@atlaskit/css-reset": "^6.16.0",
-    "@forge/bridge": "^5.9.0",
+    "@atlaskit/css-reset": "^6.6.2",
+    "@forge/bridge": "5.9.0",
     "react": "^16",
-    "react-dom": "^16",
-    "xlsx": "^0.18.5"
-  },
-  "devDependencies": {
-    "react-scripts": "^5.0.1"
+    "react-dom": "^16"
   },
   "scripts": {
     "start": "react-scripts start",
@@ -29,5 +25,8 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
+  },
+  "devDependencies": {
+    "react-scripts": "^5.0.1"
   }
 }

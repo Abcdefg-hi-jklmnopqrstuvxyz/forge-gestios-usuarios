@@ -1,61 +1,104 @@
 import React, { useEffect, useState } from 'react';
 import { invoke, view } from '@forge/bridge';
 
+const CLIENTS = [
+  "Dirección General de Rentas",
+  "Municipalidad de Salta",
+  "Municipalidad del Interior",
+  "Gob Tech"
+];
+
+const TYPES = ["Nota", "Requerimiento"];
+
 const CustomFieldUser = () => {
   const [users, setUsers] = useState([]);
-  const [selectedUser, setSelectedUser] = useState(null);
-  
+  const [tipo, setTipo] = useState(TYPES[0]);
+  const [cliente, setCliente] = useState(CLIENTS[0]);
+  const [selectedUserObj, setSelectedUserObj] = useState(null);
+
   useEffect(() => {
     invoke('getUsers').then(setUsers);
   }, []);
 
   useEffect(() => {
+    // get existing value (if editing)
     view.getContext().then((ctx) => {
-        const fieldValue = ctx.extension.fieldValue;
-        if (fieldValue) {
-            setSelectedUser(fieldValue);
-        }
+      const fieldValue = ctx.extension.fieldValue;
+      if (fieldValue && typeof fieldValue === 'object') {
+        setSelectedUserObj(fieldValue);
+        // prefill tipo/cliente if available
+        if (fieldValue.tipo) setTipo(fieldValue.tipo);
+        if (fieldValue.cliente) setCliente(fieldValue.cliente);
+      }
     });
   }, []);
 
-  const handleChange = (e) => {
-    const userName = e.target.value;
-    const userObj = users.find(u => u.name === userName);
-    
+  // filter users by selected cliente and tipo
+  const filtered = users.filter(u => u.cliente === cliente && u.tipo === tipo);
+
+  const handleUserChange = (e) => {
+    const username = e.target.value;
+    const userObj = filtered.find(u => u.usuario === username);
     if (userObj) {
-      setSelectedUser(userObj);
-      view.submit(userObj); 
+      setSelectedUserObj(userObj);
+      // submit the whole object to be stored (Option B)
+      view.submit(userObj);
+    } else {
+      // clear
+      setSelectedUserObj(null);
+      view.submit(null);
     }
+  };
+
+  // If cliente/tipo changes we clear selection
+  const handleTipoChange = (val) => {
+    setTipo(val);
+    setSelectedUserObj(null);
+    view.submit(null);
+  };
+
+  const handleClienteChange = (val) => {
+    setCliente(val);
+    setSelectedUserObj(null);
+    view.submit(null);
   };
 
   return (
     <div className="cf-container">
-      <div>
-        <label className="label">
-          Cliente
-        </label>
-        <select 
-          className="cf-select"
-          value={selectedUser?.name || ''}
-          onChange={handleChange}
-        >
-          <option value="">-- Seleccionar cliente --</option>
-          {users.map(u => (
-             <option key={u.name} value={u.name}>{u.name}</option>
+      <div style={{marginBottom: '8px'}}>
+        <label className="label">Tipo de solicitud</label>
+        <select className="cf-select" value={tipo} onChange={e => handleTipoChange(e.target.value)}>
+          {TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+        </select>
+      </div>
+
+      <div style={{marginBottom: '8px'}}>
+        <label className="label">Cliente</label>
+        <select className="cf-select" value={cliente} onChange={e => handleClienteChange(e.target.value)}>
+          {CLIENTS.map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
+      </div>
+
+      <div style={{marginBottom: '8px'}}>
+        <label className="label">Usuario</label>
+        <select className="cf-select" value={selectedUserObj?.usuario || ''} onChange={handleUserChange}>
+          <option value="">-- Seleccionar usuario --</option>
+          {filtered.map(u => (
+            <option key={`${u.tipo}-${u.cliente}-${u.usuario}`} value={u.usuario}>
+              {u.usuario} {u.departamento ? `(${u.departamento})` : ''} {u.telefono ? `- ${u.telefono}` : ''}
+            </option>
           ))}
         </select>
       </div>
 
       <div>
-        <label className="label">
-          Teléfono
-        </label>
-        <input 
-            className="cf-input-readonly"
-            type="text" 
-            readOnly 
-            value={selectedUser?.phone || ''}
-        />
+        <label className="label">Teléfono</label>
+        <input className="cf-input-readonly" type="text" readOnly value={selectedUserObj?.telefono || ''} />
+      </div>
+
+      <div>
+        <label className="label">Departamento</label>
+        <input className="cf-input-readonly" type="text" readOnly value={selectedUserObj?.departamento || ''} />
       </div>
     </div>
   );

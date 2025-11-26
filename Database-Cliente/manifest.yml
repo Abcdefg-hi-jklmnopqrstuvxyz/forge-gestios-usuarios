@@ -1,0 +1,19 @@
+modules:
+  jira:projectPage:
+    - key: database-cliente-hello-world-project-page
+      resource: main
+      resolver:
+        function: resolver
+      title: Database Cliente
+  function:
+    - key: resolver
+      handler: index.handler
+resources:
+  - key: main
+    path: static/hello-world/build
+app:
+  runtime:
+    name: nodejs22.x
+    memoryMB: 256
+    architecture: arm64
+  id: ari:cloud:ecosystem::app/841a69c9-4cf2-4579-a41b-cc310a888651

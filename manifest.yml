@@ -8,17 +8,17 @@ modules:
       route: admin-users
 
   jira:customField:
-    - key: usuario-registrado-field
-      name: Clientes registrados
-      description: Selecciona un cliente de la base de datos
-      type: object
+  - key: usuario-registrado-field
+    name: Cliente asignado
+    description: Selecciona el usuario asociado al cliente
+    type: object
+    resource: main
+    resolver:
+      function: resolver
+    edit:
       resource: main
-      resolver:
-        function: resolver
-      edit:
-        resource: main
-      formatter:
-        expression: "value.name"
+    formatter:
+      expression: "value.usuario + ' | ' + value.telefono + ' | ' + value.departamento"
 
   function:
     - key: resolver
@@ -39,4 +39,4 @@ app:
     name: nodejs22.x
     memoryMB: 256
     architecture: arm64
-  id: ari:cloud:ecosystem::app/008d0ac1-b35d-4092-8f57-e3685e7b264d
+  id: ari:cloud:ecosystem::app/841a69c9-4cf2-4579-a41b-cc310a888651

@@ -2,17 +2,33 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { invoke } from '@forge/bridge';
 import * as XLSX from 'xlsx';
 
+const CLIENTS = [
+  "Dirección General de Rentas",
+  "Municipalidad de Salta",
+  "Municipalidad del Interior",
+  "Gob Tech"
+];
+
+const TYPES = ["Nota", "Requerimiento"];
+
 function AdminPage() {
   const [users, setUsers] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
-  
-  const [newName, setNewName] = useState('');
-  const [newPhone, setNewPhone] = useState('');
-  
+
+  // New form fields
+  const [tipo, setTipo] = useState(TYPES[0]);
+  const [cliente, setCliente] = useState(CLIENTS[0]);
+  const [usuario, setUsuario] = useState('');
+  const [telefono, setTelefono] = useState('');
+  const [departamento, setDepartamento] = useState('');
+
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingUser, setEditingUser] = useState(null); 
-  const [editName, setEditName] = useState('');
-  const [editPhone, setEditPhone] = useState('');
+  const [editingUser, setEditingUser] = useState(null);
+  const [editTipo, setEditTipo] = useState('');
+  const [editCliente, setEditCliente] = useState('');
+  const [editUsuario, setEditUsuario] = useState('');
+  const [editTelefono, setEditTelefono] = useState('');
+  const [editDepartamento, setEditDepartamento] = useState('');
 
   const [status, setStatus] = useState('');
 
@@ -24,12 +40,16 @@ function AdminPage() {
   };
 
   const handleManualSave = async () => {
-    if (!newName || !newPhone) return alert('Nombre y teléfono requeridos');
+    if (!usuario || !telefono) return alert('Usuario y teléfono requeridos');
     setStatus('Guardando...');
-    await invoke('saveUser', { name: newName, phone: newPhone });
-    setNewName('');
-    setNewPhone('');
-    setStatus('Cliente guardado correctamente.');
+    await invoke('saveUser', {
+      tipo, cliente, usuario, telefono, departamento
+    });
+    // limpiar
+    setUsuario('');
+    setTelefono('');
+    setDepartamento('');
+    setStatus('Registro guardado correctamente.');
     loadUsers();
     setTimeout(() => setStatus(''), 3000);
   };
@@ -44,12 +64,17 @@ function AdminPage() {
       const wb = XLSX.read(bstr, { type: 'binary' });
       const wsname = wb.SheetNames[0];
       const ws = wb.Sheets[wsname];
-      const data = XLSX.utils.sheet_to_json(ws);
+      const data = XLSX.utils.sheet_to_json(ws, { defval: '' });
 
+      // Map various possible column names to our schema
       const cleanData = data.map(row => ({
-        name: row.USUARIO_INCIDENTE || row.Nombre || 'Sin Nombre',
-        phone: String(row.TELEFONO || row.Telefono || '')
-      })).filter(u => u.name !== 'Sin Nombre');
+        tipo: row.Tipo || row.tipo || row.Type || 'Nota',
+        cliente: row.Cliente || row.cliente || row.Organization || CLIENTS[0],
+        usuario: row.Usuario || row.USUARIO_INCIDENTE || row.Nombre || row.nombre || row.User || '',
+        telefono: String(row.Telefono || row.TELEFONO || row.phone || row.Phone || ''),
+        departamento: row.Departamento || row.departamento || row.Area || row.area || ''
+      }))
+      .filter(r => r.usuario && r.cliente); // require minimal fields
 
       saveBulk(cleanData);
     };
@@ -64,36 +89,51 @@ function AdminPage() {
     setTimeout(() => setStatus(''), 4000);
   };
 
-  const handleDelete = async (name) => {
-    if (window.confirm(`¿Está seguro de eliminar a ${name}?`)) {
-      await invoke('deleteUser', { name });
+  const handleDelete = async (u) => {
+    if (window.confirm(`¿Está seguro de eliminar a ${u.usuario} (${u.cliente} - ${u.tipo})?`)) {
+      await invoke('deleteUser', { tipo: u.tipo, cliente: u.cliente, usuario: u.usuario });
       loadUsers();
     }
   };
 
   const openEditModal = (user) => {
     setEditingUser(user);
-    setEditName(user.name);
-    setEditPhone(user.phone);
+    setEditTipo(user.tipo);
+    setEditCliente(user.cliente);
+    setEditUsuario(user.usuario);
+    setEditTelefono(user.telefono);
+    setEditDepartamento(user.departamento);
     setIsModalOpen(true);
   };
 
   const handleUpdate = async () => {
-    if (!editName || !editPhone) return alert('Datos incompletos');
+    if (!editUsuario || !editTelefono) return alert('Datos incompletos');
     await invoke('updateUser', {
-      originalName: editingUser.name,
-      newName: editName,
-      newPhone: editPhone
+      originalTipo: editingUser.tipo,
+      originalCliente: editingUser.cliente,
+      originalUsuario: editingUser.usuario,
+      tipo: editTipo,
+      cliente: editCliente,
+      usuario: editUsuario,
+      telefono: editTelefono,
+      departamento: editDepartamento
     });
     setIsModalOpen(false);
     setEditingUser(null);
     loadUsers();
   };
+  const exportToExcel = () => {
+  const worksheet = XLSX.utils.json_to_sheet(users);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Clientes");
 
+  XLSX.writeFile(workbook, "clientes_registrados.xlsx");
+};
   const filteredUsers = useMemo(() => {
-    return users.filter(u => 
-      u.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-      u.phone.includes(searchTerm)
+    return users.filter(u =>
+      (u.usuario || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (u.telefono || '').includes(searchTerm) ||
+      (u.cliente || '').toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [users, searchTerm]);
 
@@ -102,57 +142,94 @@ function AdminPage() {
       <h2 className="header">Gestión de clientes</h2>
 
       <div className="section">
-        <h3 className="section-title">Registrar nuevo cliente</h3>
+        <h3 className="section-title">Registrar nuevo registro</h3>
+
         <div className="form-row">
           <div className="form-group">
-            <label className="label">Nombre del cliente</label>
-            <input className="input" value={newName} onChange={e => setNewName(e.target.value)} placeholder="Ej. Juan Pérez" />
+            <label className="label">Tipo de solicitud</label>
+            <select className="input" value={tipo} onChange={e => setTipo(e.target.value)}>
+              {TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
+          </div>
+
+          <div className="form-group">
+            <label className="label">Cliente</label>
+            <select className="input" value={cliente} onChange={e => setCliente(e.target.value)}>
+              {CLIENTS.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+        </div>
+
+        <div className="form-row">
+          <div className="form-group">
+            <label className="label">Usuario</label>
+            <input className="input" value={usuario} onChange={e => setUsuario(e.target.value)} placeholder="Ej. Juan Pérez" />
           </div>
           <div className="form-group">
             <label className="label">Teléfono</label>
-            <input className="input" value={newPhone} onChange={e => setNewPhone(e.target.value)} placeholder="+52..." />
+            <input className="input" value={telefono} onChange={e => setTelefono(e.target.value)} placeholder="+51..." />
+          </div>
+          <div className="form-group">
+            <label className="label">Departamento</label>
+            <input className="input" value={departamento} onChange={e => setDepartamento(e.target.value)} placeholder="Departamento A" />
           </div>
         </div>
-        <button className="btn btn-primary" onClick={handleManualSave}>Guardar cliente</button>
+
+        <button className="btn btn-primary" onClick={handleManualSave}>Guardar registro</button>
         {status && <div className="status-msg">{status}</div>}
       </div>
 
       <div className="section">
         <h3 className="section-title">Importar masivamente</h3>
-        <label className="label">Archivo Excel (Columnas: USUARIO_INCIDENTE, TELEFONO)</label>
+        <label className="label">Archivo Excel (Columnas: Tipo, Cliente, Usuario, Telefono, Departamento)</label>
         <input type="file" accept=".xlsx, .xls" onChange={handleFileUpload} style={{marginTop: '5px'}} />
       </div>
 
       <div className="section">
         <h3 className="section-title">Directorio de clientes</h3>
-        <input 
+        <button 
+          className="cf-button" 
+          onClick={exportToExcel} 
+          style={{ marginTop: '15px', marginBottom: '20px' }}
+        >
+          Exportar Excel
+        </button>
+
+
+        <input
           className="input"
-          placeholder="Buscar por nombre o teléfono..." 
-          value={searchTerm} 
-          onChange={e => setSearchTerm(e.target.value)} 
+          placeholder="Buscar por usuario, teléfono o cliente..."
+          value={searchTerm}
+          onChange={e => setSearchTerm(e.target.value)}
           style={{marginBottom: '10px'}}
         />
-        
+
         <table className="table">
           <thead>
             <tr>
-              <th>Nombre</th>
+              <th>Tipo</th>
+              <th>Cliente</th>
+              <th>Usuario</th>
               <th>Teléfono</th>
-              <th width="150">Acciones</th>
+              <th>Departamento</th>
+              <th width="170">Acciones</th>
             </tr>
           </thead>
           <tbody>
             {filteredUsers.length > 0 ? filteredUsers.map((u, i) => (
-              <tr key={i}>
-                <td>{u.name}</td>
-                <td>{u.phone}</td>
+              <tr key={`${u.tipo}-${u.cliente}-${u.usuario}-${i}`}>
+                <td>{u.tipo}</td>
+                <td>{u.cliente}</td>
+                <td>{u.usuario}</td>
+                <td>{u.telefono}</td>
+                <td>{u.departamento}</td>
                 <td>
                   <button className="btn btn-secondary" onClick={() => openEditModal(u)}>Editar</button>
-                  <button className="btn btn-danger" onClick={() => handleDelete(u.name)}>Eliminar</button>
+                  <button className="btn btn-danger" onClick={() => handleDelete(u)}>Eliminar</button>
                 </td>
               </tr>
             )) : (
-              <tr><td colSpan="3" style={{padding: '20px', textAlign: 'center', color: '#6B778C'}}>No se encontraron clientes</td></tr>
+              <tr><td colSpan="6" style={{padding: '20px', textAlign: 'center', color: '#6B778C'}}>No se encontraron registros</td></tr>
             )}
           </tbody>
         </table>
@@ -161,15 +238,37 @@ function AdminPage() {
       {isModalOpen && (
         <div className="modal-overlay">
           <div className="modal-content">
-            <h3 className="section-title">Editar cliente</h3>
+            <h3 className="section-title">Editar registro</h3>
+
             <div style={{marginBottom: '10px'}}>
-                <label className="label">Nombre</label>
-                <input className="input" value={editName} onChange={e => setEditName(e.target.value)} />
+              <label className="label">Tipo</label>
+              <select className="input" value={editTipo} onChange={e => setEditTipo(e.target.value)}>
+                {TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
             </div>
-            <div>
-                <label className="label">Teléfono</label>
-                <input className="input" value={editPhone} onChange={e => setEditPhone(e.target.value)} />
+
+            <div style={{marginBottom: '10px'}}>
+              <label className="label">Cliente</label>
+              <select className="input" value={editCliente} onChange={e => setEditCliente(e.target.value)}>
+                {CLIENTS.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
             </div>
+
+            <div style={{marginBottom: '10px'}}>
+              <label className="label">Usuario</label>
+              <input className="input" value={editUsuario} onChange={e => setEditUsuario(e.target.value)} />
+            </div>
+
+            <div style={{marginBottom: '10px'}}>
+              <label className="label">Teléfono</label>
+              <input className="input" value={editTelefono} onChange={e => setEditTelefono(e.target.value)} />
+            </div>
+
+            <div style={{marginBottom: '10px'}}>
+              <label className="label">Departamento</label>
+              <input className="input" value={editDepartamento} onChange={e => setEditDepartamento(e.target.value)} />
+            </div>
+
             <div className="modal-actions">
               <button className="btn btn-secondary" onClick={() => setIsModalOpen(false)}>Cancelar</button>
               <button className="btn btn-primary" onClick={handleUpdate}>Guardar cambios</button>
