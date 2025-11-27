@@ -4,7 +4,7 @@ import { invoke, view } from '@forge/bridge';
 const CLIENTS = [
   "Dirección General de Rentas",
   "Municipalidad de Salta",
-  "Municipalidad del Interior",
+  "Municipios del Interior",
   "Gob Tech"
 ];
 

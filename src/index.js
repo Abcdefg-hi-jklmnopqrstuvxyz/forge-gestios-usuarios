@@ -6,7 +6,7 @@ const resolver = new Resolver();
 const CLIENTS = [
   "Dirección General de Rentas",
   "Municipalidad de Salta",
-  "Municipalidad del Interior",
+  "Municipios del Interior",
   "Gob Tech"
 ];
 
