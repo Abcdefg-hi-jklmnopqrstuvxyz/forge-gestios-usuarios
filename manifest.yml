@@ -8,28 +8,41 @@ modules:
       route: admin-users
 
   jira:customField:
-  - key: usuario-registrado-field
-    name: Cliente asignado
-    description: Selecciona el usuario asociado al cliente
-    type: object
-    resource: main
-    resolver:
-      function: resolver
-    edit:
-      resource: main
-    formatter:
-      expression: "value.usuario + ' | ' + value.telefono + ' | ' + value.departamento"
+    - key: resuelto-por-field
+      name: Resuelto Por
+      description: Selecciona el usuario que resolvió el requerimiento según el cliente.
+      type: string
+      edit:
+        function: resuelto-por
+      view:
+        function: resuelto-por-view
+    - key: resuelto-departamento-field
+      name: Dpto Resuelto Por
+      description: Muestra el departamento del usuario seleccionado en "Resuelto Por".
+      type: string
+      edit:
+        function: resuelto-departamento
+      view:
+        function: resuelto-departamento-view
 
   webtrigger:
-  - key: autocompletar-usuario-webtrigger
-    function: webtrigger-fn
-    description: Webtrigger para autocompletar telefono y departamento
+    - key: autocompletar-usuario-webtrigger
+      function: webtrigger-fn
+      description: Webtrigger para autocompletar telefono y departamento
 
   function:
     - key: resolver
       handler: index.handler
     - key: webtrigger-fn
       handler: webtrigger.webtriggerHandler
+    - key: resuelto-por
+      handler: custom-fields.resolvedByEdit
+    - key: resuelto-por-view
+      handler: custom-fields.resolvedByView
+    - key: resuelto-departamento
+      handler: custom-fields.resolvedDepartmentEdit
+    - key: resuelto-departamento-view
+      handler: custom-fields.resolvedDepartmentView
 
 resources:
   - key: main
