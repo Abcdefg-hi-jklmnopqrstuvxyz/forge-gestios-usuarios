@@ -1,11 +1,8 @@
 modules:
   jira:globalPage:
     - key: usuarios-admin-page
-      resource: main
-      resolver:
-        function: resolver
+      function: admin-page
       title: "Gestión de base de datos de clientes"
-      route: admin-users
 
   jira:customField:
     - key: resuelto-por-field
@@ -35,6 +32,8 @@ modules:
       handler: index.handler
     - key: webtrigger-fn
       handler: webtrigger.webtriggerHandler
+    - key: admin-page
+      handler: admin-page.renderAdminPage
     - key: resuelto-por
       handler: custom-fields.resolvedByEdit
     - key: resuelto-por-view
@@ -43,10 +42,6 @@ modules:
       handler: custom-fields.resolvedDepartmentEdit
     - key: resuelto-departamento-view
       handler: custom-fields.resolvedDepartmentView
-
-resources:
-  - key: main
-    path: static/hello-world/build
 
 permissions:
   scopes:
