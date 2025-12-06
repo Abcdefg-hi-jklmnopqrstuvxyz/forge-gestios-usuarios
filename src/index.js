@@ -3,27 +3,20 @@ import Resolver from '@forge/resolver';
 import {
   CustomFieldEdit,
   CustomFieldView,
+  Fragment,
   Option,
   Select,
-  Stack,
   Text,
   render,
   useEffect,
   useProductContext,
   useState
-} from '@forge/react';
+} from '@forge/ui';
 
 const resolver = new Resolver();
 
-const CLIENTS = [
-  "Dirección General de Rentas",
-  "Municipalidad de Salta",
-  "Municipios del Interior",
-  "Gob Tech"
-];
-
-const TYPES = ["Nota", "Requerimiento"];
 const CLIENT_FIELD_ID = 'customfield_10121';
+const REQUIREMENT_TYPE = 'Requerimiento';
 
 // Límite seguro: 200KB por chunk
 const MAX_CHUNK_SIZE = 200000;
@@ -97,25 +90,14 @@ async function getAllUsersRaw() {
 }
 
 function normalizeEntries(entries) {
-  return entries.map(e => {
-    if (e.name || e.phone) {
-      return {
-        tipo: TYPES[0],
-        cliente: CLIENTS[0],
-        usuario: e.name || '',
-        telefono: e.phone || '',
-        departamento: e.departamento || ''
-      };
-    }
-
-    return {
-      tipo: e.tipo || TYPES[0],
-      cliente: e.cliente || CLIENTS[0],
-      usuario: e.usuario || '',
-      telefono: e.telefono || '',
-      departamento: e.departamento || ''
-    };
-  });
+  return entries.map((entry) => ({
+    // Preserve the stored values without injecting defaults to avoid hardcoded data in the field options.
+    tipo: entry.tipo || '',
+    cliente: entry.cliente || '',
+    usuario: entry.usuario || entry.name || '',
+    telefono: entry.telefono || entry.phone || '',
+    departamento: entry.departamento || ''
+  }));
 }
 
 async function getAllUsers() {
@@ -132,6 +114,15 @@ async function getAllUsers() {
 async function getIssueField(issueKey, fieldId) {
   // Reads a single issue field using the app's credentials.
   const response = await api.asUser().requestJira(
+    route`/rest/api/3/issue/${issueKey}?fields=${fieldId}`
+  );
+  const data = await response.json();
+  return data && data.fields ? data.fields[fieldId] : undefined;
+}
+
+async function getIssueCliente(issueKey, fieldId = CLIENT_FIELD_ID) {
+  // The Cliente field must be read as the app per the requirements.
+  const response = await api.asApp().requestJira(
     route`/rest/api/3/issue/${issueKey}?fields=${fieldId}`
   );
   const data = await response.json();
@@ -172,7 +163,7 @@ resolver.define('getIssueCliente', async (req) => {
     return { value: '' };
   }
 
-  const value = await getIssueField(issueKey, fieldId);
+  const value = await getIssueCliente(issueKey, fieldId);
   return { value: value || '' };
 });
 
@@ -236,8 +227,9 @@ resolver.define('bulkSaveUsers', async (req) => {
   combined.forEach(u => {
     const key = `${u.tipo}|||${u.cliente}|||${u.usuario}`;
     map.set(key, {
-      tipo: u.tipo || TYPES[0],
-      cliente: u.cliente || CLIENTS[0],
+      // Preserve incoming user data while ensuring empty strings instead of undefined values.
+      tipo: u.tipo || '',
+      cliente: u.cliente || '',
       usuario: u.usuario || '',
       telefono: u.telefono || '',
       departamento: u.departamento || ''
@@ -311,10 +303,10 @@ const ResueltoPorEdit = () => {
     // Load Cliente and candidate users, then hydrate the initial selection from Jira.
     const run = async () => {
       try {
-        const clienteValue = await getIssueField(issueKey, CLIENT_FIELD_ID);
+        const clienteValue = await getIssueCliente(issueKey, CLIENT_FIELD_ID);
         const users = await getAllUsers();
         const filtered = users.filter((user) => {
-          const matchesTipo = user.tipo === TYPES[1];
+          const matchesTipo = (user.tipo || '').toLowerCase() === REQUIREMENT_TYPE.toLowerCase();
           const matchesCliente = (user.cliente || '').toLowerCase() === (clienteValue || '').toLowerCase();
           return matchesTipo && matchesCliente;
         });
@@ -366,7 +358,7 @@ const ResueltoPorEdit = () => {
       usuario: state.selectedUser || '',
       departamento: state.selectedDepartamento || ''
     }),
-    children: Stack({
+    children: Fragment({
       children: [
         Text({ content: 'Selecciona el usuario que resolvió el requerimiento.' }),
         state.error ? Text({ content: state.error }) : null,
@@ -419,10 +411,10 @@ const DptoResueltoPorEdit = () => {
           return;
         }
 
-        const clienteValue = await getIssueField(issueKey, CLIENT_FIELD_ID);
+        const clienteValue = await getIssueCliente(issueKey, CLIENT_FIELD_ID);
         const users = await getAllUsers();
         const filteredUsers = users.filter((user) => {
-          const matchesTipo = user.tipo === TYPES[1];
+          const matchesTipo = (user.tipo || '').toLowerCase() === REQUIREMENT_TYPE.toLowerCase();
           const matchesCliente = (user.cliente || '').toLowerCase() === (clienteValue || '').toLowerCase();
           return matchesTipo && matchesCliente;
         });
@@ -444,7 +436,7 @@ const DptoResueltoPorEdit = () => {
 
   return CustomFieldEdit({
     onSave: async () => state.departamento || '',
-    children: Stack({
+    children: Fragment({
       children: [
         Text({ content: 'Departamento asociado al usuario seleccionado en Resuelto Por.' }),
         state.error ? Text({ content: state.error }) : Text({ content: display })
