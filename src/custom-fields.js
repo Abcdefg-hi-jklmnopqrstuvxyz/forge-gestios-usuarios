@@ -1,222 +1,141 @@
-import { render, Select, Option, Text, Stack, Spinner, useEffect, useState, useProductContext } from '@forge/react';
-import api, { route } from '@forge/api';
-import { fetchAllUsersFromResolver } from './index';
+import React, { useEffect, useState } from "react";
+import { view, invoke } from "@forge/bridge";
 
-// Constantes de nombre para ubicar los campos relacionados.
-const CLIENT_FIELD_ID = 'customfield_10121';
-const RESUELTO_POR_FIELD_NAME = 'Resuelto Por';
+// IDs de Jira
+const CLIENT_FIELD_ID = "customfield_10121";
+const RESUELTO_POR_FIELD_ID = "customfield_10128";
 
-// Obtiene el valor del campo "Cliente" desde el issue usando asApp (requerido por el usuario).
-async function fetchCliente(issueKey) {
-  const response = await api.asApp().requestJira(
-    route`/rest/api/3/issue/${issueKey}?fields=${CLIENT_FIELD_ID}`
-  );
-
-  if (!response.ok) {
-    console.error('No se pudo leer el campo Cliente', response.status, await response.text());
-    return '';
-  }
-
-  const body = await response.json();
-  return body?.fields?.[CLIENT_FIELD_ID] || '';
+async function fetchCliente() {
+    const ctx = await view.getContext();
+    return ctx.extension.issue.fields[CLIENT_FIELD_ID]?.value || "";
 }
 
-// Obtiene el ID real del campo "Resuelto Por" buscando por nombre en el catálogo de campos.
-let cachedResueltoPorId = '';
-async function getResueltoPorFieldId() {
-  if (cachedResueltoPorId) {
-    return cachedResueltoPorId;
-  }
-
-  const response = await api.asApp().requestJira(route`/rest/api/3/field`);
-  if (!response.ok) {
-    console.error('No se pudo consultar la lista de campos', response.status, await response.text());
-    return '';
-  }
-
-  const fields = await response.json();
-  const match = fields.find((field) => field.name === RESUELTO_POR_FIELD_NAME);
-  cachedResueltoPorId = match?.id || '';
-  return cachedResueltoPorId;
+async function fetchUsers() {
+    return await invoke("getUsers");
 }
 
-// Lee el valor del campo "Resuelto Por" almacenado actualmente en el issue.
-async function fetchResueltoPorValue(issueKey) {
-  const fieldId = await getResueltoPorFieldId();
-  if (!fieldId) {
-    return '';
-  }
+// ------ EDIT: RESUELTO POR ------
+export const rpEdit = ({ value, onChange }) => {
+    const [cliente, setCliente] = useState("");
+    const [options, setOptions] = useState([]);
+    const [loading, setLoading] = useState(true);
 
-  const response = await api.asApp().requestJira(
-    route`/rest/api/3/issue/${issueKey}?fields=${fieldId}`
-  );
+    useEffect(() => {
+        async function load() {
+            const cli = await fetchCliente();
+            setCliente(cli);
 
-  if (!response.ok) {
-    console.error('No se pudo leer el campo Resuelto Por', response.status, await response.text());
-    return '';
-  }
+            const users = await fetchUsers();
+            const filtered = users.filter(
+                (u) => u.tipo === "Requerimiento" && u.cliente === cli
+            );
 
-  const body = await response.json();
-  return body?.fields?.[fieldId] || '';
-}
+            const opts = filtered.map((u) => ({
+                label: u.usuario,
+                value: u.usuario
+            }));
 
-// Filtra los usuarios por cliente y tipo "Requerimiento".
-async function fetchUsersForCliente(cliente) {
-  const users = await fetchAllUsersFromResolver();
-  return users.filter(
-    (record) => record.tipo === 'Requerimiento' && record.cliente === cliente
-  );
-}
+            setOptions(opts);
 
-// ===== Campo "Resuelto Por" =====
-export const resolvedByEdit = render((props) => {
-  const [cliente, setCliente] = useState('');
-  const [options, setOptions] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [errorMessage, setErrorMessage] = useState('');
-  const context = useProductContext();
+            if (!value && opts.length > 0) {
+                onChange(opts[0].value);
+            }
 
-  const issueKey = context?.platformContext?.issueKey || '';
-
-  useEffect(() => {
-    const loadOptions = async () => {
-      setLoading(true);
-      setErrorMessage('');
-      try {
-        const clienteValue = await fetchCliente(issueKey);
-        setCliente(clienteValue);
-
-        const filteredUsers = await fetchUsersForCliente(clienteValue);
-        const selectOptions = filteredUsers.map((record) => ({
-          label: record.usuario,
-          value: record.usuario
-        }));
-        setOptions(selectOptions);
-
-        // Si el valor actual no está en la lista (o está vacío), seleccionamos la primera opción disponible.
-        if (!props.value && selectOptions.length > 0) {
-          props.onChange(selectOptions[0].value);
-        } else if (
-          props.value &&
-          !selectOptions.some((entry) => entry.value === props.value) &&
-          selectOptions.length > 0
-        ) {
-          props.onChange(selectOptions[0].value);
+            setLoading(false);
         }
-      } catch (error) {
-        console.error('Error cargando opciones de usuarios', error);
-        setErrorMessage('No se pudieron cargar usuarios desde storage.');
-      } finally {
-        setLoading(false);
-      }
-    };
+        load();
+    }, []);
 
-    if (issueKey) {
-      loadOptions();
+    if (loading) {
+        return React.createElement("p", null, "Cargando usuarios…");
     }
-  }, [issueKey, props]);
 
-  if (loading) {
-    return (
-      <Stack>
-        <Spinner />
-        <Text>Buscando usuarios para el cliente…</Text>
-      </Stack>
-    );
-  }
-
-  if (errorMessage) {
-    return <Text>{errorMessage}</Text>;
-  }
-
-  if (!cliente) {
-    return <Text>Primero completa el campo Cliente para obtener opciones.</Text>;
-  }
-
-  if (options.length === 0) {
-    return <Text>No hay usuarios de Requerimiento cargados para {cliente}.</Text>;
-  }
-
-  return (
-    <Select
-      label={`Resuelto Por (${cliente})`}
-      onChange={(value) => props.onChange(value)}
-      value={props.value || ''}
-    >
-      {options.map((option) => (
-        <Option key={option.value} label={option.label} value={option.value} />
-      ))}
-    </Select>
-  );
-});
-
-export const resolvedByView = render((props) => {
-  const selected = props.value || 'Sin usuario seleccionado';
-  return <Text>{selected}</Text>;
-});
-
-// ===== Campo "Dpto Resuelto Por" =====
-export const resolvedDepartmentEdit = render((props) => {
-  const [departamento, setDepartamento] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [message, setMessage] = useState('');
-  const context = useProductContext();
-
-  const issueKey = context?.platformContext?.issueKey || '';
-
-  useEffect(() => {
-    const loadDepartment = async () => {
-      setLoading(true);
-      setMessage('');
-      try {
-        const selectedUser = await fetchResueltoPorValue(issueKey);
-        if (!selectedUser) {
-          setMessage('Selecciona un usuario en "Resuelto Por" para ver su departamento.');
-          props.onChange('');
-          return;
-        }
-
-        const users = await fetchUsersForCliente(await fetchCliente(issueKey));
-        const match = users.find((entry) => entry.usuario === selectedUser);
-
-        const depto = match?.departamento || '';
-        setDepartamento(depto);
-        props.onChange(depto);
-
-        if (!depto) {
-          setMessage('No se encontró un departamento para el usuario seleccionado.');
-        }
-      } catch (error) {
-        console.error('Error obteniendo departamento asociado', error);
-        setMessage('No se pudo calcular el departamento.');
-        props.onChange('');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (issueKey) {
-      loadDepartment();
+    if (!cliente) {
+        return React.createElement("p", null, "Primero seleccione un Cliente.");
     }
-  }, [issueKey, props]);
 
-  if (loading) {
-    return (
-      <Stack>
-        <Spinner />
-        <Text>Determinando el departamento…</Text>
-      </Stack>
+    if (options.length === 0) {
+        return React.createElement("p", null, "No hay usuarios para el cliente.");
+    }
+
+    return React.createElement(
+        "div",
+        null,
+        React.createElement("label", null, `Resuelto Por (${cliente})`),
+        React.createElement(
+            "select",
+            {
+                style: { width: "100%", padding: "8px", marginTop: "6px" },
+                value: value || "",
+                onChange: (e) => onChange(e.target.value)
+            },
+            options.map((o) =>
+                React.createElement(
+                    "option",
+                    { key: o.value, value: o.value },
+                    o.label
+                )
+            )
+        )
     );
-  }
+};
 
-  if (message) {
-    return <Text>{message}</Text>;
-  }
+// ------ VIEW: RESUELTO POR ------
+export const rpView = ({ value }) => {
+    return React.createElement(
+        "p",
+        null,
+        value || "Sin usuario seleccionado"
+    );
+};
 
-  return <Text>{departamento || 'Sin departamento disponible'}</Text>;
-});
+// ------ EDIT: DPTO RESUELTO POR ------
+export const rdEdit = ({ value, onChange }) => {
+    const [loading, setLoading] = useState(true);
+    const [departamento, setDepartamento] = useState("");
 
-export const resolvedDepartmentView = render((props) => {
-  const value = props.value || 'Sin departamento disponible';
-  return <Text>{value}</Text>;
-});
+    useEffect(() => {
+        async function load() {
+            setLoading(true);
+
+            const ctx = await view.getContext();
+            const resueltoField = ctx.extension.issue.fields[RESUELTO_POR_FIELD_ID]?.value;
+
+            if (!resueltoField) {
+                setDepartamento("");
+                onChange("");
+                setLoading(false);
+                return;
+            }
+
+            const cliente = await fetchCliente();
+            const users = await fetchUsers();
+
+            const match = users.find(
+                (u) => u.usuario === resueltoField && u.cliente === cliente
+            );
+
+            const depto = match?.departamento || "";
+            setDepartamento(depto);
+            onChange(depto);
+
+            setLoading(false);
+        }
+        load();
+    }, []);
+
+    if (loading) {
+        return React.createElement("p", null, "Cargando departamento…");
+    }
+
+    return React.createElement(
+        "p",
+        null,
+        departamento || "Sin departamento disponible"
+    );
+};
+
+// ------ VIEW: DPTO RESUELTO POR ------
+export const rdView = ({ value }) => {
+    return React.createElement("p", null, value || "Sin departamento disponible");
+};

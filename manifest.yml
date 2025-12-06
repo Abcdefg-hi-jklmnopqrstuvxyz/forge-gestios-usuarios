@@ -13,37 +13,44 @@ modules:
       description: Selecciona el usuario que resolvió el requerimiento según el cliente.
       type: string
       edit:
-        function: resuelto-por
+        function: rpEdit
       view:
-        function: resuelto-por-view
+        function: rpView
+
     - key: resuelto-departamento-field
       name: Dpto Resuelto Por
-      description: Muestra el departamento del usuario seleccionado en "Resuelto Por".
+      description: Muestra el departamento del usuario seleccionado.
       type: string
       edit:
-        function: resuelto-departamento
+        function: rdEdit
       view:
-        function: resuelto-departamento-view
+        function: rdView
 
   webtrigger:
     - key: autocompletar-usuario-webtrigger
-      function: webtrigger-fn
+      function: webtriggerFn
       description: Webtrigger para autocompletar telefono y departamento
 
   function:
     - key: resolver
       handler: index.handler
-    - key: webtrigger-fn
-      handler: webtrigger.webtriggerHandler
-    - key: resuelto-por
-      handler: custom-fields.resolvedByEdit
-    - key: resuelto-por-view
-      handler: custom-fields.resolvedByView
-    - key: resuelto-departamento
-      handler: custom-fields.resolvedDepartmentEdit
-    - key: resuelto-departamento-view
-      handler: custom-fields.resolvedDepartmentView
 
+    - key: webtriggerFn
+      handler: webtrigger.webtriggerHandler
+
+    # == Custom UI functions (wrappers)
+    - key: rpEdit
+      handler: custom-fields.rpEdit
+
+    - key: rpView
+      handler: custom-fields.rpView
+
+    - key: rdEdit
+      handler: custom-fields.rdEdit
+
+    - key: rdView
+      handler: custom-fields.rdView
+  
 resources:
   - key: main
     path: static/hello-world/build
@@ -59,4 +66,4 @@ app:
     name: nodejs22.x
     memoryMB: 256
     architecture: arm64
-  id: ari:cloud:ecosystem::app/841a69c9-4cf2-4579-a41b-cc310a888651
+  id: ari:cloud:ecosystem::app/27e7174e-e5b7-4553-bcd2-ea4ecba727a1
