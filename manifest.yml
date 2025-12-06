@@ -7,22 +7,38 @@ modules:
       title: "Gestión de base de datos de clientes"
       route: admin-users
 
-  jira:customField:
-  - key: usuario-registrado-field
-    name: Cliente asignado
-    description: Selecciona el usuario asociado al cliente
-    type: object
-    resource: main
-    resolver:
-      function: resolver
-    edit:
-      resource: main
-    formatter:
-      expression: "value.usuario + ' | ' + value.telefono + ' | ' + value.departamento"
+  jira:customFieldType:
+    - key: resuelto-por-field
+      name: Resuelto Por
+      description: Selecciona el usuario que resolvió el requerimiento
+      type: string
+      render: native
+      edit:
+        function: resuelto-por-edit
+      view:
+        function: resuelto-por-view
+
+    - key: dpto-resuelto-por-field
+      name: Dpto Resuelto Por
+      description: Departamento asociado al usuario seleccionado en Resuelto Por
+      type: string
+      render: native
+      edit:
+        function: dpto-resuelto-por-edit
+      view:
+        function: dpto-resuelto-por-view
 
   function:
     - key: resolver
       handler: index.handler
+    - key: resuelto-por-edit
+      handler: index.resueltoPorEdit
+    - key: resuelto-por-view
+      handler: index.resueltoPorView
+    - key: dpto-resuelto-por-edit
+      handler: index.dptoResueltoPorEdit
+    - key: dpto-resuelto-por-view
+      handler: index.dptoResueltoPorView
 
 resources:
   - key: main
