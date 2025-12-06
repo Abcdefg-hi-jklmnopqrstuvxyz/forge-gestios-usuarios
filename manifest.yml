@@ -14,18 +14,18 @@ modules:
       type: object
       renderers:
         edit:
-          resource: custom-fields
+          function: resuelto-por-edit
         view:
-          resource: custom-fields
+          function: resuelto-por-view
     - key: dpto-resuelto-por-field
       name: Dpto Resuelto Por
       description: Departamento asociado al usuario seleccionado en Resuelto Por
       type: string
       renderers:
         edit:
-          resource: custom-fields
+          function: dpto-resuelto-por-edit
         view:
-          resource: custom-fields
+          function: dpto-resuelto-por-view
 
   webtrigger:
     - key: autocompletar-usuario-webtrigger
@@ -37,12 +37,18 @@ modules:
       handler: index.handler
     - key: webtrigger-fn
       handler: webtrigger.webtriggerHandler
+    - key: resuelto-por-edit
+      handler: index.resueltoPorEdit
+    - key: resuelto-por-view
+      handler: index.resueltoPorView
+    - key: dpto-resuelto-por-edit
+      handler: index.dptoResueltoPorEdit
+    - key: dpto-resuelto-por-view
+      handler: index.dptoResueltoPorView
 
 resources:
   - key: main
     path: static/hello-world/build
-  - key: custom-fields
-    path: static/custom-fields
 
 permissions:
   scopes:

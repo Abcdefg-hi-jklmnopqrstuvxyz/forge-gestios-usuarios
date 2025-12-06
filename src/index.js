@@ -1,5 +1,17 @@
 import api, { storage, route } from '@forge/api';
 import Resolver from '@forge/resolver';
+import {
+  CustomFieldEdit,
+  CustomFieldView,
+  Option,
+  Select,
+  Stack,
+  Text,
+  render,
+  useEffect,
+  useProductContext,
+  useState
+} from '@forge/react';
 
 const resolver = new Resolver();
 
@@ -119,7 +131,7 @@ async function getAllUsers() {
 
 async function getIssueField(issueKey, fieldId) {
   // Reads a single issue field using the app's credentials.
-  const response = await api.asApp().requestJira(
+  const response = await api.asUser().requestJira(
     route`/rest/api/3/issue/${issueKey}?fields=${fieldId}`
   );
   const data = await response.json();
@@ -128,7 +140,7 @@ async function getIssueField(issueKey, fieldId) {
 
 async function getFieldIdByModuleKey(moduleKey) {
   // Discovers the numeric Jira field id (e.g., customfield_12345) using the Forge module key.
-  const searchResponse = await api.asApp().requestJira(
+  const searchResponse = await api.asUser().requestJira(
     route`/rest/api/3/field/search?query=${moduleKey}`
   );
   const searchData = await searchResponse.json();
@@ -255,5 +267,203 @@ resolver.define('getResueltoPorValue', async (req) => {
   const value = await getIssueField(issueKey, targetFieldId);
   return { value: value || null };
 });
+
+// ===== UI KIT RENDERERS =====
+
+function getIssueKeyFromContext(productContext) {
+  // Safely retrieves the issue key from the product context for both edit and view renderers.
+  if (!productContext) {
+    return '';
+  }
+
+  // UI kit contexts can surface the issueKey on either extensionContext or platformContext
+  const extensionIssue = productContext.extensionContext && productContext.extensionContext.issueKey
+    ? productContext.extensionContext.issueKey
+    : '';
+  const platformIssue = productContext.platformContext && productContext.platformContext.issueKey
+    ? productContext.platformContext.issueKey
+    : '';
+
+  return extensionIssue || platformIssue || '';
+}
+
+function buildResueltoOptions(users) {
+  // Converts filtered user entries into Select options without hardcoded values.
+  return users.map((user) => {
+    const label = `${user.usuario}${user.departamento ? ` (${user.departamento})` : ''}`;
+    return Option({ label, value: user.usuario });
+  });
+}
+
+const ResueltoPorEdit = () => {
+  const context = useProductContext();
+  const issueKey = getIssueKeyFromContext(context);
+
+  const [state, setState] = useState({
+    loading: true,
+    options: [],
+    selectedUser: '',
+    selectedDepartamento: '',
+    error: ''
+  });
+
+  useEffect(() => {
+    // Load Cliente and candidate users, then hydrate the initial selection from Jira.
+    const run = async () => {
+      try {
+        const clienteValue = await getIssueField(issueKey, CLIENT_FIELD_ID);
+        const users = await getAllUsers();
+        const filtered = users.filter((user) => {
+          const matchesTipo = user.tipo === TYPES[1];
+          const matchesCliente = (user.cliente || '').toLowerCase() === (clienteValue || '').toLowerCase();
+          return matchesTipo && matchesCliente;
+        });
+
+        let storedUser = '';
+        let storedDepartamento = '';
+        const fieldId = await getFieldIdByModuleKey('resuelto-por-field');
+        if (fieldId) {
+          const storedValue = await getIssueField(issueKey, fieldId);
+          storedUser = storedValue && storedValue.usuario ? storedValue.usuario : '';
+          storedDepartamento = storedValue && storedValue.departamento ? storedValue.departamento : '';
+        }
+
+        setState({
+          loading: false,
+          options: filtered,
+          selectedUser: storedUser,
+          selectedDepartamento: storedDepartamento,
+          error: filtered.length === 0 ? 'No hay usuarios disponibles para el cliente seleccionado.' : ''
+        });
+      } catch (err) {
+        console.error('Error cargando opciones de Resuelto Por', err);
+        setState({
+          loading: false,
+          options: [],
+          selectedUser: '',
+          selectedDepartamento: '',
+          error: 'No se pudieron cargar los usuarios desde storage.'
+        });
+      }
+    };
+
+    run();
+  }, [issueKey]);
+
+  const onChangeUser = (newUser) => {
+    // When a user is picked, locate the department immediately for save operations.
+    const match = state.options.find((u) => u.usuario === newUser);
+    const departamento = match && match.departamento ? match.departamento : '';
+    setState({
+      ...state,
+      selectedUser: newUser,
+      selectedDepartamento: departamento
+    });
+  };
+
+  return CustomFieldEdit({
+    onSave: async () => ({
+      usuario: state.selectedUser || '',
+      departamento: state.selectedDepartamento || ''
+    }),
+    children: Stack({
+      children: [
+        Text({ content: 'Selecciona el usuario que resolvió el requerimiento.' }),
+        state.error ? Text({ content: state.error }) : null,
+        Select({
+          label: 'Resuelto Por',
+          isRequired: false,
+          isDisabled: state.loading || state.options.length === 0,
+          value: state.selectedUser,
+          onChange: onChangeUser,
+          children: [
+            Option({ label: 'Selecciona un usuario', value: '' }),
+            ...buildResueltoOptions(state.options)
+          ]
+        })
+      ].filter(Boolean)
+    })
+  });
+};
+
+const ResueltoPorView = (props) => {
+  const value = props && props.value ? props.value : null;
+  const display = value && value.usuario
+    ? `${value.usuario}${value.departamento ? ` – ${value.departamento}` : ''}`
+    : 'Sin usuario seleccionado';
+
+  return CustomFieldView({
+    children: Text({ content: display })
+  });
+};
+
+const DptoResueltoPorEdit = () => {
+  const context = useProductContext();
+  const issueKey = getIssueKeyFromContext(context);
+
+  const [state, setState] = useState({
+    loading: true,
+    departamento: '',
+    error: ''
+  });
+
+  useEffect(() => {
+    const run = async () => {
+      try {
+        const fieldId = await getFieldIdByModuleKey('resuelto-por-field');
+        const stored = fieldId ? await getIssueField(issueKey, fieldId) : null;
+        const selectedUser = stored && stored.usuario ? stored.usuario : '';
+
+        if (!selectedUser) {
+          setState({ loading: false, departamento: '', error: 'Sin usuario seleccionado en Resuelto Por.' });
+          return;
+        }
+
+        const clienteValue = await getIssueField(issueKey, CLIENT_FIELD_ID);
+        const users = await getAllUsers();
+        const filteredUsers = users.filter((user) => {
+          const matchesTipo = user.tipo === TYPES[1];
+          const matchesCliente = (user.cliente || '').toLowerCase() === (clienteValue || '').toLowerCase();
+          return matchesTipo && matchesCliente;
+        });
+
+        const found = filteredUsers.find((u) => u.usuario === selectedUser);
+        const departamento = found && found.departamento ? found.departamento : '';
+
+        setState({ loading: false, departamento, error: '' });
+      } catch (err) {
+        console.error('Error cargando departamento derivado', err);
+        setState({ loading: false, departamento: '', error: 'No se pudo calcular el departamento.' });
+      }
+    };
+
+    run();
+  }, [issueKey]);
+
+  const display = state.departamento || 'Sin departamento asignado';
+
+  return CustomFieldEdit({
+    onSave: async () => state.departamento || '',
+    children: Stack({
+      children: [
+        Text({ content: 'Departamento asociado al usuario seleccionado en Resuelto Por.' }),
+        state.error ? Text({ content: state.error }) : Text({ content: display })
+      ]
+    })
+  });
+};
+
+const DptoResueltoPorView = (props) => {
+  const display = props && props.value ? props.value : 'Sin departamento asignado';
+
+  return CustomFieldView({
+    children: Text({ content: display })
+  });
+};
+
+export const resueltoPorEdit = render(ResueltoPorEdit);
+export const resueltoPorView = render(ResueltoPorView);
+export const dptoResueltoPorEdit = render(DptoResueltoPorEdit);
+export const dptoResueltoPorView = render(DptoResueltoPorView);
 
 export const handler = resolver.getDefinitions();
