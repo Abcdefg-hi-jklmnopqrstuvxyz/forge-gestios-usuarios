@@ -11,6 +11,7 @@ const CLIENTS = [
 ];
 
 const TYPES = ["Nota", "Requerimiento"];
+const CLIENT_FIELD_ID = 'customfield_10121';
 
 // Límite seguro: 200KB por chunk
 const MAX_CHUNK_SIZE = 200000;
@@ -116,10 +117,51 @@ async function getAllUsers() {
   return normalized;
 }
 
+async function getIssueField(issueKey, fieldId) {
+  // Reads a single issue field using the app's credentials.
+  const response = await api.asApp().requestJira(
+    route`/rest/api/3/issue/${issueKey}?fields=${fieldId}`
+  );
+  const data = await response.json();
+  return data && data.fields ? data.fields[fieldId] : undefined;
+}
+
+async function getFieldIdByModuleKey(moduleKey) {
+  // Discovers the numeric Jira field id (e.g., customfield_12345) using the Forge module key.
+  const searchResponse = await api.asApp().requestJira(
+    route`/rest/api/3/field/search?query=${moduleKey}`
+  );
+  const searchData = await searchResponse.json();
+  if (!searchData || !Array.isArray(searchData.values)) {
+    return '';
+  }
+
+  const match = searchData.values.find((field) => {
+    if (!field || !field.key) {
+      return false;
+    }
+    return field.key.includes(moduleKey);
+  });
+
+  return match && match.id ? match.id : '';
+}
+
 // ===== RESOLVERS =====
 
 resolver.define('getUsers', async () => {
   return await getAllUsers();
+});
+
+resolver.define('getIssueCliente', async (req) => {
+  // Reads the Cliente field (customfield_10121) for the given issue.
+  const issueKey = req.payload && req.payload.issueKey ? req.payload.issueKey : '';
+  const fieldId = req.payload && req.payload.fieldId ? req.payload.fieldId : CLIENT_FIELD_ID;
+  if (!issueKey) {
+    return { value: '' };
+  }
+
+  const value = await getIssueField(issueKey, fieldId);
+  return { value: value || '' };
 });
 
 resolver.define('saveUser', async (req) => {
@@ -194,6 +236,24 @@ resolver.define('bulkSaveUsers', async (req) => {
   await saveUsersChunked(uniqueUsers);
 
   return { success: true, count: uniqueUsers.length };
+});
+
+resolver.define('getResueltoPorValue', async (req) => {
+  // Returns the stored value of the "Resuelto Por" custom field for the given issue.
+  const issueKey = req.payload && req.payload.issueKey ? req.payload.issueKey : '';
+  const moduleKey = req.payload && req.payload.moduleKey ? req.payload.moduleKey : '';
+
+  if (!issueKey || !moduleKey) {
+    return { value: null };
+  }
+
+  const targetFieldId = await getFieldIdByModuleKey(moduleKey);
+  if (!targetFieldId) {
+    return { value: null };
+  }
+
+  const value = await getIssueField(issueKey, targetFieldId);
+  return { value: value || null };
 });
 
 export const handler = resolver.getDefinitions();

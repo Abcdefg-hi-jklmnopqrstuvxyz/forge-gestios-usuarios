@@ -7,23 +7,30 @@ modules:
       title: "Gestión de base de datos de clientes"
       route: admin-users
 
-  jira:customField:
-  - key: usuario-registrado-field
-    name: Cliente asignado
-    description: Selecciona el usuario asociado al cliente
-    type: object
-    resource: main
-    resolver:
-      function: resolver
-    edit:
-      resource: main
-    formatter:
-      expression: "value.usuario + ' | ' + value.telefono + ' | ' + value.departamento"
+  jira:customFieldType:
+    - key: resuelto-por-field
+      name: Resuelto Por
+      description: Selecciona el usuario que resolvió el requerimiento
+      type: object
+      renderers:
+        edit:
+          resource: custom-fields
+        view:
+          resource: custom-fields
+    - key: dpto-resuelto-por-field
+      name: Dpto Resuelto Por
+      description: Departamento asociado al usuario seleccionado en Resuelto Por
+      type: string
+      renderers:
+        edit:
+          resource: custom-fields
+        view:
+          resource: custom-fields
 
   webtrigger:
-  - key: autocompletar-usuario-webtrigger
-    function: webtrigger-fn
-    description: Webtrigger para autocompletar telefono y departamento
+    - key: autocompletar-usuario-webtrigger
+      function: webtrigger-fn
+      description: Webtrigger para autocompletar telefono y departamento
 
   function:
     - key: resolver
@@ -34,6 +41,8 @@ modules:
 resources:
   - key: main
     path: static/hello-world/build
+  - key: custom-fields
+    path: static/custom-fields
 
 permissions:
   scopes:

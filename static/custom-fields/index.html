@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Campos personalizados</title>
+    <style>
+      body { font-family: Arial, sans-serif; font-size: 14px; padding: 12px; }
+      label { display: block; margin-bottom: 6px; font-weight: 600; }
+      select { width: 100%; padding: 8px; box-sizing: border-box; }
+      .field-row { margin-bottom: 12px; }
+      .error { color: #c00; }
+      .muted { color: #666; }
+      .stack { display: flex; flex-direction: column; gap: 8px; }
+    </style>
+  </head>
+  <body>
+    <div id="app" class="stack">
+      <div class="muted">Cargando contexto...</div>
+    </div>
+    <script type="module">
+      import { customField, invoke, view } from 'https://esm.sh/@forge/bridge@5.9.0';
+
+      const USER_TYPE_FILTER = 'Requerimiento';
+      const CLIENT_FIELD_ID = 'customfield_10121';
+      const RESUELTO_POR_MODULE_KEY = 'resuelto-por-field';
+
+      const appRoot = document.getElementById('app');
+
+      function setContent(element) {
+        appRoot.innerHTML = '';
+        appRoot.appendChild(element);
+      }
+
+      function buildMessage(text, className = 'muted') {
+        const div = document.createElement('div');
+        div.textContent = text;
+        div.className = className;
+        return div;
+      }
+
+      async function readCliente(issueKey) {
+        const result = await invoke('getIssueCliente', { issueKey, fieldId: CLIENT_FIELD_ID });
+        return result && result.value ? result.value : '';
+      }
+
+      async function readUsersByCliente(cliente) {
+        const allUsers = await invoke('getUsers');
+        if (!Array.isArray(allUsers)) {
+          return [];
+        }
+        return allUsers.filter((user) => {
+          const matchesTipo = user.tipo === USER_TYPE_FILTER;
+          const matchesCliente = (user.cliente || '').toLowerCase() === (cliente || '').toLowerCase();
+          return matchesTipo && matchesCliente;
+        });
+      }
+
+      function renderResueltoPorEdit(issueKey) {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'stack';
+        wrapper.appendChild(buildMessage('Selecciona el usuario que resolvió el requerimiento.'));
+
+        const selectLabel = document.createElement('label');
+        selectLabel.textContent = 'Resuelto por';
+        selectLabel.setAttribute('for', 'resuelto-select');
+        wrapper.appendChild(selectLabel);
+
+        const select = document.createElement('select');
+        select.id = 'resuelto-select';
+        select.disabled = true;
+        wrapper.appendChild(select);
+
+        setContent(wrapper);
+
+        (async () => {
+          try {
+            const cliente = await readCliente(issueKey);
+            const users = await readUsersByCliente(cliente);
+            select.innerHTML = '';
+
+            if (!users.length) {
+              select.disabled = true;
+              wrapper.appendChild(buildMessage('No hay usuarios disponibles para el cliente seleccionado.', 'error'));
+              await customField.setValue({ usuario: '', departamento: '' });
+              return;
+            }
+
+            const placeholder = document.createElement('option');
+            placeholder.value = '';
+            placeholder.textContent = 'Selecciona un usuario';
+            select.appendChild(placeholder);
+
+            users.forEach((user) => {
+              const opt = document.createElement('option');
+              opt.value = user.usuario;
+              opt.textContent = `${user.usuario} (${user.departamento || 'Sin departamento'})`;
+              opt.dataset.departamento = user.departamento || '';
+              select.appendChild(opt);
+            });
+
+            const stored = await customField.getValue();
+            if (stored && stored.usuario) {
+              select.value = stored.usuario;
+            }
+
+            select.disabled = false;
+
+            select.addEventListener('change', () => {
+              const selectedOption = select.options[select.selectedIndex];
+              const departamento = selectedOption ? selectedOption.dataset.departamento || '' : '';
+              customField.setValue({ usuario: select.value, departamento });
+            });
+          } catch (err) {
+            console.error('Error loading users', err);
+            setContent(buildMessage('No se pudieron cargar los usuarios desde storage.', 'error'));
+          }
+        })();
+      }
+
+      function renderResueltoPorView(value) {
+        const text = value && value.usuario ? `${value.usuario}${value.departamento ? ' – ' + value.departamento : ''}` : 'Sin usuario seleccionado';
+        setContent(buildMessage(text));
+      }
+
+      async function renderDepartamentoEdit(issueKey) {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'stack';
+        const label = buildMessage('Departamento detectado:');
+        wrapper.appendChild(label);
+        const valueEl = document.createElement('div');
+        valueEl.textContent = 'Calculando...';
+        wrapper.appendChild(valueEl);
+        setContent(wrapper);
+
+        try {
+          const resueltoValue = await invoke('getResueltoPorValue', {
+            issueKey,
+            moduleKey: RESUELTO_POR_MODULE_KEY
+          });
+          const usuario = resueltoValue && resueltoValue.value && resueltoValue.value.usuario ? resueltoValue.value.usuario : '';
+          if (!usuario) {
+            valueEl.textContent = 'Sin asignar';
+            await customField.setValue('');
+            return;
+          }
+
+          const cliente = await readCliente(issueKey);
+          const users = await readUsersByCliente(cliente);
+          const matched = users.find((u) => u.usuario === usuario);
+          const departamento = matched && matched.departamento ? matched.departamento : '';
+          valueEl.textContent = departamento || 'Sin asignar';
+          await customField.setValue(departamento || '');
+        } catch (err) {
+          console.error('Error computing department', err);
+          setContent(buildMessage('No se pudo calcular el departamento.', 'error'));
+        }
+      }
+
+      function renderDepartamentoView(value) {
+        const text = value ? value : 'Sin departamento asignado';
+        setContent(buildMessage(text));
+      }
+
+      async function init() {
+        try {
+          const context = await view.getContext();
+          const issueKey = context && context.extensionContext ? context.extensionContext.issueKey : '';
+          const fieldValue = await customField.getValue();
+
+          if (context.moduleKey === 'resuelto-por-field') {
+            if (context.renderingType === 'view') {
+              renderResueltoPorView(fieldValue);
+            } else {
+              renderResueltoPorEdit(issueKey);
+            }
+            return;
+          }
+
+          if (context.moduleKey === 'dpto-resuelto-por-field') {
+            if (context.renderingType === 'view') {
+              renderDepartamentoView(fieldValue);
+            } else {
+              renderDepartamentoEdit(issueKey);
+            }
+            return;
+          }
+
+          setContent(buildMessage('Módulo desconocido', 'error'));
+        } catch (err) {
+          console.error('init error', err);
+          setContent(buildMessage('Error inicializando la vista del campo.', 'error'));
+        }
+      }
+
+      init();
+    </script>
+  </body>
+</html>
