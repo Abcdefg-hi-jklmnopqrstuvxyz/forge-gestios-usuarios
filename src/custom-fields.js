@@ -1,4 +1,4 @@
-import { render, Select, Option, Text, Stack, Spinner, useEffect, useState, useProductContext } from '@forge/react';
+import { createElement, render, Select, Option, Text, Stack, Spinner, useEffect, useState, useProductContext } from '@forge/react';
 import api, { route } from '@forge/api';
 import { fetchAllUsersFromResolver } from './index';
 
@@ -117,42 +117,54 @@ export const resolvedByEdit = render((props) => {
   }, [issueKey, props]);
 
   if (loading) {
-    return (
-      <Stack>
-        <Spinner />
-        <Text>Buscando usuarios para el cliente…</Text>
-      </Stack>
+    return createElement(
+      Stack,
+      null,
+      createElement(Spinner, null),
+      createElement(Text, null, 'Buscando usuarios para el cliente…')
     );
   }
 
   if (errorMessage) {
-    return <Text>{errorMessage}</Text>;
+    return createElement(Text, null, errorMessage);
   }
 
   if (!cliente) {
-    return <Text>Primero completa el campo Cliente para obtener opciones.</Text>;
+    return createElement(
+      Text,
+      null,
+      'Primero completa el campo Cliente para obtener opciones.'
+    );
   }
 
   if (options.length === 0) {
-    return <Text>No hay usuarios de Requerimiento cargados para {cliente}.</Text>;
+    return createElement(
+      Text,
+      null,
+      `No hay usuarios de Requerimiento cargados para ${cliente}.`
+    );
   }
 
-  return (
-    <Select
-      label={`Resuelto Por (${cliente})`}
-      onChange={(value) => props.onChange(value)}
-      value={props.value || ''}
-    >
-      {options.map((option) => (
-        <Option key={option.value} label={option.label} value={option.value} />
-      ))}
-    </Select>
+  return createElement(
+    Select,
+    {
+      label: `Resuelto Por (${cliente})`,
+      onChange: (value) => props.onChange(value),
+      value: props.value || ''
+    },
+    options.map((option) =>
+      createElement(Option, {
+        key: option.value,
+        label: option.label,
+        value: option.value
+      })
+    )
   );
 });
 
 export const resolvedByView = render((props) => {
   const selected = props.value || 'Sin usuario seleccionado';
-  return <Text>{selected}</Text>;
+  return createElement(Text, null, selected);
 });
 
 // ===== Campo "Dpto Resuelto Por" =====
@@ -201,22 +213,22 @@ export const resolvedDepartmentEdit = render((props) => {
   }, [issueKey, props]);
 
   if (loading) {
-    return (
-      <Stack>
-        <Spinner />
-        <Text>Determinando el departamento…</Text>
-      </Stack>
+    return createElement(
+      Stack,
+      null,
+      createElement(Spinner, null),
+      createElement(Text, null, 'Determinando el departamento…')
     );
   }
 
   if (message) {
-    return <Text>{message}</Text>;
+    return createElement(Text, null, message);
   }
 
-  return <Text>{departamento || 'Sin departamento disponible'}</Text>;
+  return createElement(Text, null, departamento || 'Sin departamento disponible');
 });
 
 export const resolvedDepartmentView = render((props) => {
   const value = props.value || 'Sin departamento disponible';
-  return <Text>{value}</Text>;
+  return createElement(Text, null, value);
 });
