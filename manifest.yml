@@ -20,9 +20,16 @@ modules:
     formatter:
       expression: "value.usuario + ' | ' + value.telefono + ' | ' + value.departamento"
 
+  webtrigger:
+  - key: autocompletar-usuario-webtrigger
+    function: webtrigger-fn
+    description: Webtrigger para autocompletar telefono y departamento
+
   function:
     - key: resolver
       handler: index.handler
+    - key: webtrigger-fn
+      handler: webtrigger.webtriggerHandler
 
 resources:
   - key: main

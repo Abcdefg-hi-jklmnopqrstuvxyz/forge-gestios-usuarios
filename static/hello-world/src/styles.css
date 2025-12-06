@@ -36,7 +36,7 @@ body {
   padding: 20px;
   margin-bottom: 24px;
   box-shadow: 0 2px 6px rgba(9, 30, 66, 0.06);
-  transition: box-shadow 0.2s ease;
+  transition: box-shadow 0.2s ease, transform 0.1s ease;
 }
 
 .section:hover {
@@ -98,6 +98,7 @@ body {
 .cf-input-readonly {
   background-color: #EBECF0;
   color: #505F79;
+  border: 1.8px solid #C1C7D0;
 }
 
 /* ----------------------------
@@ -110,7 +111,7 @@ body {
   cursor: pointer;
   font-weight: 500;
   font-size: 14px;
-  transition: background 0.2s ease, transform 0.1s ease;
+  transition: background 0.2s ease, transform 0.1s ease, box-shadow 0.2s ease;
 }
 
 .btn:active {
@@ -236,6 +237,7 @@ body {
   flex-direction: column;
   gap: 12px;
   width: 100%;
+  padding: 4px 2px;
 }
 
 .cf-select {
@@ -245,4 +247,6 @@ body {
 .cf-input-readonly {
   border-radius: 6px;
   border-color: #C1C7D0;
+  background-color: #F4F5F7;
+  color: #505F79;
 }
