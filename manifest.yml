@@ -8,29 +8,44 @@ modules:
       route: admin-users
 
   jira:customField:
+    # Campo: Cliente asignado
+    - key: usuario-registrado-field
+      name: Cliente asignado
+      description: Selecciona el usuario asociado al cliente
+      type: object
+      resource: main
+      resolver:
+        function: resolver
+      edit:
+        resource: main
+      formatter:
+        expression: "value.usuario + ' | ' + value.telefono + ' | ' + value.departamento"
+    # Campo: Resuelto Por
     - key: resuelto-por-field
       name: Resuelto Por
-      description: Selecciona el usuario que resolvió el requerimiento según el cliente.
-      type: string
+      description: Usuario que resolvió el requerimiento
+      type: object
+      resource: main
+      resolver:
+        function: resolver
       edit:
-        function: rpEdit
-      view:
-        function: rpView
+        resource: main
+      formatter:
+        expression: "value.usuario"
 
-    - key: resuelto-departamento-field
+    # Campo: Dpto Resuelto Por (solo lectura)
+    - key: dpto-resuelto-field
       name: Dpto Resuelto Por
-      description: Muestra el departamento del usuario seleccionado.
+      description: Departamento del usuario que resolvió
       type: string
+      resource: main
+      resolver:
+        function: resolver
       edit:
-        function: rdEdit
-      view:
-        function: rdView
-
-  webtrigger:
-    - key: autocompletar-usuario-webtrigger
-      function: webtriggerFn
-      description: Webtrigger para autocompletar telefono y departamento
-
+        resource: main
+      formatter:
+        expression: "value.departamento"
+    
   function:
     - key: resolver
       handler: index.handler
@@ -38,19 +53,11 @@ modules:
     - key: webtriggerFn
       handler: webtrigger.webtriggerHandler
 
-    # == Custom UI functions (wrappers)
-    - key: rpEdit
-      handler: custom-fields.rpEdit
-
-    - key: rpView
-      handler: custom-fields.rpView
-
-    - key: rdEdit
-      handler: custom-fields.rdEdit
-
-    - key: rdView
-      handler: custom-fields.rdView
-  
+  webtrigger:
+    - key: autocompletar-usuario-webtrigger
+      function: webtriggerFn
+      description: Webtrigger para autocompletar telefono y departamento
+      
 resources:
   - key: main
     path: static/hello-world/build
@@ -60,7 +67,7 @@ permissions:
     - read:jira-work
     - write:jira-work
     - storage:app
-
+    - read:servicedesk-request
 app:
   runtime:
     name: nodejs22.x
