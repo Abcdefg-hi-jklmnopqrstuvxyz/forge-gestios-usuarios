@@ -9,7 +9,7 @@ const CLIENTS = [
   "Gob Tech"
 ];
 
-const TYPES = ["Nota", "Requerimiento"];
+const TYPES = ["Nota", "Requerimientos"];
 
 function AdminPage() {
   const [users, setUsers] = useState([]);

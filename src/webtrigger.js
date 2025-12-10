@@ -11,7 +11,7 @@ const CLIENTS = [
   "Gob Tech"
 ];
 
-const TYPES = ["Nota", "Requerimiento"];
+const TYPES = ["Nota", "Requerimientos"];
 
 // =============================
 // FUNCIONES DE STORAGE (idénticas a index.js)

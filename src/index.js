@@ -10,7 +10,7 @@ const CLIENTS = [
   "Gob Tech"
 ];
 
-const TYPES = ["Nota", "Requerimiento"];
+const TYPES = ["Nota", "Requerimientos"];
 
 // ==============================
 //       CONFIG CHUNKING
@@ -195,11 +195,11 @@ export async function getResueltoPorField(req) {
 
   try {
     const resp = await api.asApp().requestJira(
-      route`/rest/api/3/issue/${issueKey}?fields=customfield_11635`
+      route`/rest/api/3/issue/${issueKey}?fields=customfield_11669`
     );
 
     const data = await resp.json();
-    return data.fields?.customfield_11635 || null;
+    return data.fields?.customfield_11669 || null;
   } catch (e) {
     console.log("Error getResueltoPorField:", e);
     return null;

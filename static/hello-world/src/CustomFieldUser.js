@@ -8,7 +8,7 @@ const CLIENTS = [
   "Gob Tech"
 ];
 
-const TYPES = ["Nota", "Requerimiento"];
+const TYPES = ["Nota", "Requerimientos"];
 
 const CustomFieldUser = () => {
   const [users, setUsers] = useState([]);

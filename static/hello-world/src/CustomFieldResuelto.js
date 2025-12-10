@@ -45,7 +45,7 @@ const CustomFieldResuelto = () => {
   // 👉 Filtrar por cliente tomado del issue + solo tipo "Requerimiento"
   const filteredUsers = users.filter(u =>
     u.cliente?.toLowerCase().trim() === clienteValue?.toLowerCase().trim() &&
-    u.tipo === 'Requerimiento'
+    u.tipo === 'Requerimientos'
   );
 
   const handleUserChange = (e) => {
