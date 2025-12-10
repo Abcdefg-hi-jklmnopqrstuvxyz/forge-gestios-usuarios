@@ -14,7 +14,6 @@ const CustomFieldResuelto = () => {
         const context = await view.getContext();
         const issueKey = context.extension.issue.key;
 
-        // 👉 Obtener valor del campo customfield_10121 desde backend
         const clienteField = await invoke("getClienteField", { issueKey });
         console.log("Cliente desde Jira:", clienteField);
 

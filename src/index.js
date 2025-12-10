@@ -13,31 +13,94 @@ const CLIENTS = [
 const TYPES = ["Nota", "Requerimiento"];
 
 // ==============================
-//   STORAGE SIMPLE Y FUNCIONAL
+//       CONFIG CHUNKING
 // ==============================
 
-async function getAllUsers() {
-  const raw = await storage.get('users');
-  if (!raw) return [];
-  return raw;
+const MAX_CHUNK_SIZE = 200000; // ~200 KB Forge limit
+
+function chunkArray(data) {
+  const chunks = [];
+  let current = [];
+  let size = 0;
+
+  for (const item of data) {
+    const itemSize = JSON.stringify(item).length;
+
+    if (size + itemSize >= MAX_CHUNK_SIZE && current.length > 0) {
+      chunks.push(current);
+      current = [item];
+      size = itemSize;
+    } else {
+      current.push(item);
+      size += itemSize;
+    }
+  }
+
+  if (current.length > 0) chunks.push(current);
+
+  return chunks;
 }
 
-async function saveAllUsers(users) {
-  await storage.set('users', users);
+async function saveUsersChunked(users) {
+  const chunks = chunkArray(users);
+
+  await storage.set("users_metadata", { chunkCount: chunks.length });
+
+  for (let i = 0; i < chunks.length; i++) {
+    await storage.set(`users_chunk_${i}`, chunks[i]);
+  }
+}
+
+async function getUsersChunked() {
+  const meta = await storage.get("users_metadata");
+
+  if (!meta) {
+    const legacy = await storage.get("users");
+    if (legacy) {
+      await saveUsersChunked(legacy);
+      await storage.delete("users");
+      return legacy;
+    }
+    return [];
+  }
+
+  const result = [];
+
+  for (let i = 0; i < meta.chunkCount; i++) {
+    const part = await storage.get(`users_chunk_${i}`);
+    if (part) result.push(...part);
+  }
+
+  return result;
 }
 
 // ==============================
-//        RESOLVERS CRUD
+// NORMALIZACIÓN (importante)
+// ==============================
+
+function normalize(entries) {
+  return entries.map(e => ({
+    tipo: e.tipo || TYPES[0],
+    cliente: e.cliente || CLIENTS[0],
+    usuario: e.usuario || '',
+    telefono: e.telefono || '',
+    departamento: e.departamento || ''
+  }));
+}
+
+// ==============================
+//       RESOLVERS CRUD
 // ==============================
 
 resolver.define("getUsers", async () => {
-  return await getAllUsers();
+  const data = await getUsersChunked();
+  return normalize(data);
 });
 
 resolver.define("saveUser", async (req) => {
   const { tipo, cliente, usuario, telefono, departamento } = req.payload;
-  let users = await getAllUsers();
 
+  let users = await getUsersChunked();
   const exists = users.find(
     u => u.tipo === tipo && u.cliente === cliente && u.usuario === usuario
   );
@@ -52,72 +115,75 @@ resolver.define("saveUser", async (req) => {
     );
   }
 
-  await saveAllUsers(users);
+  await saveUsersChunked(users);
   return { success: true };
-});
-
-resolver.define("updateUser", async (req) => {
-  const { originalTipo, originalCliente, originalUsuario, tipo, cliente, usuario, telefono, departamento } = req.payload;
-  let users = await getAllUsers();
-
-  const index = users.findIndex(
-    u => u.tipo === originalTipo && u.cliente === originalCliente && u.usuario === originalUsuario
-  );
-
-  if (index !== -1) {
-    users[index] = { tipo, cliente, usuario, telefono, departamento };
-    await saveAllUsers(users);
-    return { success: true };
-  }
-
-  return { success: false };
 });
 
 resolver.define("deleteUser", async (req) => {
   const { tipo, cliente, usuario } = req.payload;
 
-  const users = await getAllUsers();
-  const newUsers = users.filter(
+  let users = await getUsersChunked();
+  users = users.filter(
     u => !(u.tipo === tipo && u.cliente === cliente && u.usuario === usuario)
   );
 
-  await saveAllUsers(newUsers);
+  await saveUsersChunked(users);
+  return { success: true };
+});
+
+resolver.define("updateUser", async (req) => {
+  const { originalTipo, originalCliente, originalUsuario, tipo, cliente, usuario, telefono, departamento } = req.payload;
+
+  let users = await getUsersChunked();
+
+  const index = users.findIndex(
+    u =>
+      u.tipo === originalTipo &&
+      u.cliente === originalCliente &&
+      u.usuario === originalUsuario
+  );
+
+  if (index === -1) {
+    return { success: false, error: "No encontrado" };
+  }
+
+  users[index] = { tipo, cliente, usuario, telefono, departamento };
+
+  await saveUsersChunked(users);
   return { success: true };
 });
 
 resolver.define("bulkSaveUsers", async (req) => {
   const { newUsers } = req.payload;
-  let currentUsers = await getAllUsers();
 
-  const merged = [...currentUsers, ...newUsers];
+  let users = await getUsersChunked();
+  const merged = [...users, ...newUsers];
 
   const map = new Map();
   merged.forEach(u => {
     map.set(`${u.tipo}|||${u.cliente}|||${u.usuario}`, u);
   });
 
-  await saveAllUsers(Array.from(map.values()));
+  await saveUsersChunked(Array.from(map.values()));
   return { success: true };
 });
 
 // ==============================
-//     GET CAMPOS JIRA / JSM
+//     CAMPOS JIRA (GET)
 // ==============================
 
 export async function getClienteField(req) {
   const { issueKey } = req.payload;
 
   try {
-    const response = await api.asApp().requestJira(
-      route`/rest/api/3/issue/${issueKey}?fields=customfield_10121`
+    const resp = await api.asApp().requestJira(
+      route`/rest/api/3/issue/${issueKey}?fields=customfield_10726`
     );
 
-    const data = await response.json();
-    const cf = data.fields?.customfield_10121;
+    const data = await resp.json();
+    const cf = data.fields?.customfield_10726;
 
-    if (!cf) return null;
-
-    return cf.value || cf.name || null;
+    return cf?.value || cf?.name || null;
   } catch (e) {
     console.log("Error getClienteField:", e);
     return null;
@@ -128,11 +194,12 @@ export async function getResueltoPorField(req) {
   const { issueKey } = req.payload;
 
   try {
-    const response = await api.asApp().requestJira(
-      route`/rest/api/3/issue/${issueKey}?fields=customfield_10126`
+    const resp = await api.asApp().requestJira(
+      route`/rest/api/3/issue/${issueKey}?fields=customfield_11635`
     );
-    const data = await response.json();
-    return data.fields?.customfield_10126 || null;
+
+    const data = await resp.json();
+    return data.fields?.customfield_11635 || null;
   } catch (e) {
     console.log("Error getResueltoPorField:", e);
     return null;
@@ -142,4 +209,6 @@ export async function getResueltoPorField(req) {
 resolver.define("getClienteField", getClienteField);
 resolver.define("getResueltoPorField", getResueltoPorField);
 
+// Export handler
 export const handler = resolver.getDefinitions();
+

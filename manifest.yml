@@ -45,7 +45,7 @@ modules:
         resource: main
       formatter:
         expression: "value.departamento"
-    
+
   function:
     - key: resolver
       handler: index.handler
@@ -57,7 +57,7 @@ modules:
     - key: autocompletar-usuario-webtrigger
       function: webtriggerFn
       description: Webtrigger para autocompletar telefono y departamento
-      
+
 resources:
   - key: main
     path: static/hello-world/build
@@ -73,4 +73,4 @@ app:
     name: nodejs22.x
     memoryMB: 256
     architecture: arm64
-  id: ari:cloud:ecosystem::app/27e7174e-e5b7-4553-bcd2-ea4ecba727a1
+  id: ari:cloud:ecosystem::app/182a82c6-5c11-4745-8ac8-041784907ca0

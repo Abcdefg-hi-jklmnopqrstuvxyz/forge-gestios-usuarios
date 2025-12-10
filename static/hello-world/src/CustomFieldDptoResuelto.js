@@ -6,29 +6,43 @@ const CustomFieldDptoResuelto = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+
+    // ===== 1) CARGA INICIAL =====
     const initialize = async () => {
       try {
         const context = await view.getContext();
         const issueKey = context.extension.issue.key;
-        
-        // Obtener el valor del campo "Resuelto Por" desde el backend
+
         const resueltoPorData = await invoke('getResueltoPorField', { issueKey });
-        
-        if (resueltoPorData && resueltoPorData.departamento) {
+
+        if (resueltoPorData?.departamento) {
           setDepartamento(resueltoPorData.departamento);
         } else {
           setDepartamento('');
         }
-        
-        setLoading(false);
-      } catch (error) {
-        console.error('Error al inicializar Dpto Resuelto Por:', error);
-        setDepartamento('');
-        setLoading(false);
+      } catch (err) {
+        console.error("Error inicializando Dpto Resuelto:", err);
       }
+
+      setLoading(false);
     };
 
     initialize();
+
+    // ===== 2) ESCUCHAR CAMBIOS DEL CAMPO "Resuelto Por" =====
+    view.onSubmit((submittedValue) => {
+      console.log("Evento recibido de Resuelto Por:", submittedValue);
+
+      if (submittedValue?.departamento) {
+        setDepartamento(submittedValue.departamento);
+        // Guardar automáticamente en Jira
+        view.submit(submittedValue.departamento);
+      } else {
+        setDepartamento('');
+        view.submit(null);
+      }
+    });
+
   }, []);
 
   if (loading) {
@@ -38,10 +52,10 @@ const CustomFieldDptoResuelto = () => {
   return (
     <div className="cf-container">
       <div>
-        <input 
-          className="cf-input-readonly" 
-          type="text" 
-          readOnly 
+        <input
+          className="cf-input-readonly"
+          type="text"
+          readOnly
           value={departamento}
           placeholder="Se llenará automáticamente"
           style={{
@@ -50,20 +64,19 @@ const CustomFieldDptoResuelto = () => {
             border: '1px solid #dfe1e6',
             padding: '8px',
             borderRadius: '3px',
-            width: '100%',
-            boxSizing: 'border-box'
+            width: '100%'
           }}
         />
       </div>
-      
+
       {!departamento && (
-        <p style={{ 
-          color: '#666', 
-          fontSize: '12px', 
+        <p style={{
+          color: '#666',
+          fontSize: '12px',
           marginTop: '4px',
-          fontStyle: 'italic' 
+          fontStyle: 'italic'
         }}>
-          Selecciona un usuario en "Resuelto Por" para ver el departamento
+          Selecciona un usuario en "Resuelto Por".
         </p>
       )}
     </div>
