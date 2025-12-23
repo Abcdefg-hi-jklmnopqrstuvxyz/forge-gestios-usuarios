@@ -4,13 +4,14 @@ import Resolver from '@forge/resolver';
 const resolver = new Resolver();
 
 const CLIENTS = [
-  "Dirección General de Rentas",
+  "Dir. Gral. Rentas Salta",
   "Municipalidad de Salta",
   "Municipios del Interior",
   "Gob Tech"
 ];
 
 const TYPES = ["Nota", "Requerimientos"];
+const USER_KIND = ["Cliente", "Interno"];
 
 // ==============================
 //       CONFIG CHUNKING
@@ -82,6 +83,7 @@ function normalize(entries) {
   return entries.map(e => ({
     tipo: e.tipo || TYPES[0],
     cliente: e.cliente || CLIENTS[0],
+    tipoUsuario: e.tipoUsuario || USER_KIND[0],   // <<--- AGREGADO
     usuario: e.usuario || '',
     telefono: e.telefono || '',
     departamento: e.departamento || ''
@@ -98,7 +100,7 @@ resolver.define("getUsers", async () => {
 });
 
 resolver.define("saveUser", async (req) => {
-  const { tipo, cliente, usuario, telefono, departamento } = req.payload;
+  const { tipo, cliente, tipoUsuario, usuario, telefono, departamento } = req.payload;
 
   let users = await getUsersChunked();
   const exists = users.find(
@@ -106,11 +108,11 @@ resolver.define("saveUser", async (req) => {
   );
 
   if (!exists) {
-    users.push({ tipo, cliente, usuario, telefono, departamento });
+    users.push({ tipo, cliente, tipoUsuario, usuario, telefono, departamento });
   } else {
     users = users.map(u =>
       (u.tipo === tipo && u.cliente === cliente && u.usuario === usuario)
-        ? { tipo, cliente, usuario, telefono, departamento }
+        ? { tipo, cliente, tipoUsuario, usuario, telefono, departamento }
         : u
     );
   }
@@ -131,8 +133,26 @@ resolver.define("deleteUser", async (req) => {
   return { success: true };
 });
 
+resolver.define("clearUsers", async () => {
+  const metadata = await storage.get('users_metadata');
+
+  if (metadata?.chunkCount) {
+    for (let i = 0; i < metadata.chunkCount; i++) {
+      await storage.delete(`users_chunk_${i}`);
+    }
+  }
+
+  await storage.delete('users_metadata');
+  await storage.delete('users');   // por si acaso existió alguna vez
+
+  return { success: true };
+});
+
 resolver.define("updateUser", async (req) => {
-  const { originalTipo, originalCliente, originalUsuario, tipo, cliente, usuario, telefono, departamento } = req.payload;
+  const { 
+    originalTipo, originalCliente, originalUsuario,
+    tipo, cliente, tipoUsuario, usuario, telefono, departamento 
+  } = req.payload;
 
   let users = await getUsersChunked();
 
@@ -147,7 +167,7 @@ resolver.define("updateUser", async (req) => {
     return { success: false, error: "No encontrado" };
   }
 
-  users[index] = { tipo, cliente, usuario, telefono, departamento };
+  users[index] = { tipo, cliente, tipoUsuario, usuario, telefono, departamento };
 
   await saveUsersChunked(users);
   return { success: true };
@@ -161,7 +181,10 @@ resolver.define("bulkSaveUsers", async (req) => {
 
   const map = new Map();
   merged.forEach(u => {
-    map.set(`${u.tipo}|||${u.cliente}|||${u.usuario}`, u);
+    map.set(`${u.tipo}|||${u.cliente}|||${u.usuario}`, {
+      ...u,
+      tipoUsuario: u.tipoUsuario || USER_KIND[0] // <<--- AGREGADO
+    });
   });
 
   await saveUsersChunked(Array.from(map.values()));
@@ -197,8 +220,10 @@ export async function getResueltoPorField(req) {
     const resp = await api.asApp().requestJira(
       route`/rest/api/3/issue/${issueKey}?fields=customfield_11669`
     );
+    
 
     const data = await resp.json();
+    console.log("USERS STORED:", allUsers);
     return data.fields?.customfield_11669 || null;
   } catch (e) {
     console.log("Error getResueltoPorField:", e);
@@ -209,6 +234,5 @@ export async function getResueltoPorField(req) {
 resolver.define("getClienteField", getClienteField);
 resolver.define("getResueltoPorField", getResueltoPorField);
 
-// Export handler
 export const handler = resolver.getDefinitions();
 

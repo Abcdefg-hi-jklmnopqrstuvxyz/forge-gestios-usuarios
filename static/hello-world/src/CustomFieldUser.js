@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { invoke, view } from '@forge/bridge';
 
 const CLIENTS = [
-  "Dirección General de Rentas",
+  "Dir. Gral. Rentas Salta",
   "Municipalidad de Salta",
   "Municipios del Interior",
   "Gob Tech"

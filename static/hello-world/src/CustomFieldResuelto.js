@@ -10,22 +10,18 @@ const CustomFieldResuelto = () => {
   useEffect(() => {
     const initialize = async () => {
       try {
-        // Obtener el contexto del issue
         const context = await view.getContext();
         const issueKey = context.extension.issue.key;
 
+        // Obtener cliente del issue
         const clienteField = await invoke("getClienteField", { issueKey });
-        console.log("Cliente desde Jira:", clienteField);
+        if (clienteField) setClienteValue(clienteField);
 
-        if (clienteField) {
-          setClienteValue(clienteField);
-        }
-
-        // Cargar todos los usuarios almacenados
+        // Cargar usuarios del storage
         const allUsers = await invoke('getUsers');
         setUsers(allUsers);
 
-        // Recuperar el valor ya guardado (si existe)
+        // Cargar el valor ya guardado
         const fieldValue = context.extension.fieldValue;
         if (fieldValue && typeof fieldValue === 'object') {
           setSelectedUserObj(fieldValue);
@@ -42,11 +38,19 @@ const CustomFieldResuelto = () => {
     initialize();
   }, []);
 
-  // 👉 Filtrar por cliente tomado del issue + solo tipo "Requerimiento"
+  useEffect(() => {
+  console.log("USERS:", users);
+  console.log("CLIENTE VALOR:", clienteValue);
+}, [users, clienteValue]);
+
+  // ================================
+  // 💥 FILTRO MODIFICADO AQUÍ
+  // ================================
   const filteredUsers = users.filter(u =>
-    u.cliente?.toLowerCase().trim() === clienteValue?.toLowerCase().trim() &&
-    u.tipo === 'Requerimientos'
+    u.tipoUsuario === "Interno" &&
+    u.tipo === "Requerimientos"
   );
+
 
   const handleUserChange = (e) => {
     const username = e.target.value;
@@ -61,7 +65,7 @@ const CustomFieldResuelto = () => {
     
     if (userObj) {
       setSelectedUserObj(userObj);
-      view.submit(userObj); 
+      view.submit(userObj);
     } else {
       setSelectedUserObj(null);
       view.submit(null);
@@ -70,16 +74,6 @@ const CustomFieldResuelto = () => {
 
   if (loading) {
     return <div className="cf-container">Cargando...</div>;
-  }
-
-  if (!clienteValue) {
-    return (
-      <div className="cf-container">
-        <p style={{ color: '#666', fontSize: '14px' }}>
-          Primero debes seleccionar un valor en el campo "Cliente".
-        </p>
-      </div>
-    );
   }
 
   return (
@@ -92,6 +86,7 @@ const CustomFieldResuelto = () => {
           onChange={handleUserChange}
         >
           <option value="">-- Seleccionar usuario --</option>
+
           {filteredUsers.map(u => (
             <option key={`${u.cliente}-${u.usuario}`} value={u.usuario}>
               {u.usuario} {u.departamento ? `(${u.departamento})` : ''}
@@ -102,7 +97,7 @@ const CustomFieldResuelto = () => {
 
       {filteredUsers.length === 0 && (
         <p style={{ color: '#666', fontSize: '12px', marginTop: '4px' }}>
-          No hay usuarios registrados para el cliente: {clienteValue}
+          No hay usuarios internos registrados.
         </p>
       )}
     </div>
@@ -110,3 +105,4 @@ const CustomFieldResuelto = () => {
 };
 
 export default CustomFieldResuelto;
+

@@ -3,13 +3,14 @@ import { invoke } from '@forge/bridge';
 import * as XLSX from 'xlsx';
 
 const CLIENTS = [
-  "Dirección General de Rentas",
+  "Dir. Gral. Rentas Salta",
   "Municipalidad de Salta",
   "Municipios del Interior",
   "Gob Tech"
 ];
 
 const TYPES = ["Nota", "Requerimientos"];
+const USER_KIND = ["Cliente", "Interno"]; // <<--- NUEVO
 
 function AdminPage() {
   const [users, setUsers] = useState([]);
@@ -17,14 +18,17 @@ function AdminPage() {
 
   const [tipo, setTipo] = useState(TYPES[0]);
   const [cliente, setCliente] = useState(CLIENTS[0]);
+  const [tipoUsuario, setTipoUsuario] = useState(USER_KIND[0]); // <<--- NUEVO
   const [usuario, setUsuario] = useState('');
   const [telefono, setTelefono] = useState('');
   const [departamento, setDepartamento] = useState('');
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
+
   const [editTipo, setEditTipo] = useState('');
   const [editCliente, setEditCliente] = useState('');
+  const [editTipoUsuario, setEditTipoUsuario] = useState(USER_KIND[0]); // <<--- NUEVO
   const [editUsuario, setEditUsuario] = useState('');
   const [editTelefono, setEditTelefono] = useState('');
   const [editDepartamento, setEditDepartamento] = useState('');
@@ -40,18 +44,31 @@ function AdminPage() {
 
   const handleManualSave = async () => {
     if (!usuario || !telefono) return alert('Usuario y teléfono requeridos');
+    
     setStatus('Guardando...');
     await invoke('saveUser', {
-      tipo, cliente, usuario, telefono, departamento
+      tipo,
+      cliente,
+      tipoUsuario, // <<--- NUEVO
+      usuario,
+      telefono,
+      departamento
     });
+
     // limpiar
     setUsuario('');
     setTelefono('');
     setDepartamento('');
+    setTipoUsuario(USER_KIND[0]); // reset
     setStatus('Registro guardado correctamente.');
+    
     loadUsers();
     setTimeout(() => setStatus(''), 3000);
   };
+
+  // ===========================
+  //   IMPORTACIÓN MASIVA
+  // ===========================
 
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
@@ -65,18 +82,19 @@ function AdminPage() {
       const ws = wb.Sheets[wsname];
       const data = XLSX.utils.sheet_to_json(ws, { defval: '' });
 
-     
       const cleanData = data.map(row => ({
-        tipo: row.Tipo || row.tipo || row.Type || 'Nota',
-        cliente: row.Cliente || row.cliente || row.Organization || CLIENTS[0],
-        usuario: row.Usuario || row.USUARIO_INCIDENTE || row.Nombre || row.nombre || row.User || '',
-        telefono: String(row.Telefono || row.TELEFONO || row.phone || row.Phone || ''),
-        departamento: row.Departamento || row.departamento || row.Area || row.area || ''
+        tipo: row.Tipo || row.tipo || 'Nota',
+        cliente: row.Cliente || row.cliente || CLIENTS[0],
+        tipoUsuario: row.TipoUsuario || row.tipoUsuario || USER_KIND[0], // <<--- NUEVO
+        usuario: row.Usuario || row.USUARIO_INCIDENTE || row.Nombre || '',
+        telefono: String(row.Telefono || row.phone || ''),
+        departamento: row.Departamento || ''
       }))
-      .filter(r => r.usuario && r.cliente);
+      .filter(r => r.usuario);
 
       saveBulk(cleanData);
     };
+
     reader.readAsBinaryString(file);
   };
 
@@ -88,6 +106,10 @@ function AdminPage() {
     setTimeout(() => setStatus(''), 4000);
   };
 
+  // ===========================
+  //   ELIMINAR
+  // ===========================
+
   const handleDelete = async (u) => {
     if (window.confirm(`¿Está seguro de eliminar a ${u.usuario} (${u.cliente} - ${u.tipo})?`)) {
       await invoke('deleteUser', { tipo: u.tipo, cliente: u.cliente, usuario: u.usuario });
@@ -95,10 +117,15 @@ function AdminPage() {
     }
   };
 
+  // ===========================
+  //   EDITAR - ABRIR MODAL
+  // ===========================
+
   const openEditModal = (user) => {
     setEditingUser(user);
     setEditTipo(user.tipo);
     setEditCliente(user.cliente);
+    setEditTipoUsuario(user.tipoUsuario || USER_KIND[0]); // <<--- NUEVO
     setEditUsuario(user.usuario);
     setEditTelefono(user.telefono);
     setEditDepartamento(user.departamento);
@@ -107,34 +134,52 @@ function AdminPage() {
 
   const handleUpdate = async () => {
     if (!editUsuario || !editTelefono) return alert('Datos incompletos');
+
     await invoke('updateUser', {
       originalTipo: editingUser.tipo,
       originalCliente: editingUser.cliente,
       originalUsuario: editingUser.usuario,
       tipo: editTipo,
       cliente: editCliente,
+      tipoUsuario: editTipoUsuario, // <<--- NUEVO
       usuario: editUsuario,
       telefono: editTelefono,
       departamento: editDepartamento
     });
+
     setIsModalOpen(false);
     setEditingUser(null);
     loadUsers();
   };
-  const exportToExcel = () => {
-  const worksheet = XLSX.utils.json_to_sheet(users);
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, "Clientes");
 
-  XLSX.writeFile(workbook, "clientes_registrados.xlsx");
-};
+  // ============================
+  // EXPORTAR EXCEL
+  // ============================
+
+  const exportToExcel = () => {
+    const worksheet = XLSX.utils.json_to_sheet(users);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Clientes");
+
+    XLSX.writeFile(workbook, "clientes_registrados.xlsx");
+  };
+
+  // ============================
+  // BUSCADOR
+  // ============================
+
   const filteredUsers = useMemo(() => {
-    return users.filter(u =>
-      (u.usuario || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (u.telefono || '').includes(searchTerm) ||
-      (u.cliente || '').toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  }, [users, searchTerm]);
+  return users.filter(u =>
+    (u.usuario || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (u.telefono || '').includes(searchTerm) ||
+    (u.cliente || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (u.tipoUsuario || '').toLowerCase().includes(searchTerm.toLowerCase())
+  );
+}, [users, searchTerm]);
+
+  // ============================
+  // RENDER
+  // ============================
 
   return (
     <div className="admin-container">
@@ -155,6 +200,13 @@ function AdminPage() {
             <label className="label">Cliente</label>
             <select className="input" value={cliente} onChange={e => setCliente(e.target.value)}>
               {CLIENTS.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+
+          <div className="form-group">
+            <label className="label">Tipo Usuario</label>
+            <select className="input" value={tipoUsuario} onChange={e => setTipoUsuario(e.target.value)}>
+              {USER_KIND.map(t => <option key={t} value={t}>{t}</option>)}
             </select>
           </div>
         </div>
@@ -180,12 +232,13 @@ function AdminPage() {
 
       <div className="section">
         <h3 className="section-title">Importar masivamente</h3>
-        <label className="label">Archivo Excel (Columnas: Tipo, Cliente, Usuario, Telefono, Departamento)</label>
+        <label className="label">Archivo Excel (con columna opcional TipoUsuario)</label>
         <input type="file" accept=".xlsx, .xls" onChange={handleFileUpload} style={{marginTop: '5px'}} />
       </div>
 
       <div className="section">
         <h3 className="section-title">Directorio de clientes</h3>
+
         <button 
           className="cf-button" 
           onClick={exportToExcel} 
@@ -193,7 +246,6 @@ function AdminPage() {
         >
           Exportar Excel
         </button>
-
 
         <input
           className="input"
@@ -208,6 +260,7 @@ function AdminPage() {
             <tr>
               <th>Tipo</th>
               <th>Cliente</th>
+              <th>Tipo Usuario</th>
               <th>Usuario</th>
               <th>Teléfono</th>
               <th>Departamento</th>
@@ -219,6 +272,7 @@ function AdminPage() {
               <tr key={`${u.tipo}-${u.cliente}-${u.usuario}-${i}`}>
                 <td>{u.tipo}</td>
                 <td>{u.cliente}</td>
+                <td>{u.tipoUsuario}</td>
                 <td>{u.usuario}</td>
                 <td>{u.telefono}</td>
                 <td>{u.departamento}</td>
@@ -228,11 +282,15 @@ function AdminPage() {
                 </td>
               </tr>
             )) : (
-              <tr><td colSpan="6" style={{padding: '20px', textAlign: 'center', color: '#6B778C'}}>No se encontraron registros</td></tr>
+              <tr><td colSpan="7" style={{padding: '20px', textAlign: 'center', color: '#6B778C'}}>No se encontraron registros</td></tr>
             )}
           </tbody>
         </table>
       </div>
+
+      {/* ============================
+          MODAL DE EDICIÓN
+      ============================ */}
 
       {isModalOpen && (
         <div className="modal-overlay">
@@ -250,6 +308,13 @@ function AdminPage() {
               <label className="label">Cliente</label>
               <select className="input" value={editCliente} onChange={e => setEditCliente(e.target.value)}>
                 {CLIENTS.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+
+            <div style={{marginBottom: '10px'}}>
+              <label className="label">Tipo Usuario</label>
+              <select className="input" value={editTipoUsuario} onChange={e => setEditTipoUsuario(e.target.value)}>
+                {USER_KIND.map(t => <option key={t} value={t}>{t}</option>)}
               </select>
             </div>
 
@@ -275,6 +340,7 @@ function AdminPage() {
           </div>
         </div>
       )}
+
     </div>
   );
 }

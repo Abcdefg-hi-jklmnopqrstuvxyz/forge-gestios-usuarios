@@ -33,19 +33,6 @@ modules:
       formatter:
         expression: "value.usuario"
 
-    # Campo: Dpto Resuelto Por (solo lectura)
-    - key: dpto-resuelto-field
-      name: Dpto Resuelto Por
-      description: Departamento del usuario que resolvió
-      type: string
-      resource: main
-      resolver:
-        function: resolver
-      edit:
-        resource: main
-      formatter:
-        expression: "value.departamento"
-
   function:
     - key: resolver
       handler: index.handler

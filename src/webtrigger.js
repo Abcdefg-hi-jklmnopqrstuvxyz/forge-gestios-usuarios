@@ -5,13 +5,14 @@ import api, { storage, route } from '@forge/api';
 
 // Los mismos clientes y tipos usados en index.js
 const CLIENTS = [
-  "Dirección General de Rentas",
+  "Dir. Gral. Rentas Salta",
   "Municipalidad de Salta",
   "Municipios del Interior",
   "Gob Tech"
 ];
 
 const TYPES = ["Nota", "Requerimientos"];
+const USER_KIND = ["Cliente", "Interno"];
 
 // =============================
 // FUNCIONES DE STORAGE (idénticas a index.js)
@@ -38,6 +39,7 @@ function normalizeEntries(entries) {
   return entries.map(e => ({
     tipo: e.tipo || TYPES[0],
     cliente: e.cliente || CLIENTS[0],
+    tipoUsuario: e.tipoUsuario || USER_KIND[0],   // <<---- AGREGADO
     usuario: e.usuario || '',
     telefono: e.telefono || '',
     departamento: e.departamento || ''
@@ -76,10 +78,15 @@ export const webtriggerHandler = async (event) => {
       return { statusCode: 404, body: 'Usuario no encontrado' };
     }
 
+    // ================================
+    //   CAMPOS A ACTUALIZAR EN JIRA
+    // ================================
+
     const updateBody = {
       fields: {
-        customfield_11380: record.telefono,
-        customfield_11378: record.departamento
+        customfield_11380: record.telefono,       // Teléfono
+        customfield_11378: record.departamento,   // Departamento
+
       }
     };
 
@@ -105,3 +112,4 @@ export const webtriggerHandler = async (event) => {
     };
   }
 };
+
